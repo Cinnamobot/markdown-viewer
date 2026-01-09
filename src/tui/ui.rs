@@ -252,10 +252,16 @@ fn parsed_line_to_ratatui_lines(line: &ParsedLine) -> Vec<Line<'static>> {
                 ),
             };
 
-            vec![Line::from(vec![
-                Span::styled(bullet, bullet_style),
-                Span::raw(content.clone()),
-            ])]
+            let mut spans = vec![Span::styled(bullet, bullet_style)];
+            
+            // Check for inline code markers
+            if content.contains("⟨INLINE_CODE⟩") {
+                spans.extend(parse_inline_code_to_spans(content, Style::default()));
+            } else {
+                spans.push(Span::raw(content.clone()));
+            }
+
+            vec![Line::from(spans)]
         }
         ParsedLine::BlockQuote { content } => {
             let border_style = Style::default().fg(Color::Yellow);
@@ -266,10 +272,16 @@ fn parsed_line_to_ratatui_lines(line: &ParsedLine) -> Vec<Line<'static>> {
             let lines: Vec<Line> = content
                 .split('\n')
                 .map(|line| {
-                    Line::from(vec![
-                        Span::styled("▐ ", border_style),
-                        Span::styled(line.to_string(), text_style),
-                    ])
+                    let mut spans = vec![Span::styled("▐ ", border_style)];
+                    
+                    // Check for inline code markers
+                    if line.contains("⟨INLINE_CODE⟩") {
+                        spans.extend(parse_inline_code_to_spans(line, text_style));
+                    } else {
+                        spans.push(Span::styled(line.to_string(), text_style));
+                    }
+                    
+                    Line::from(spans)
                 })
                 .collect();
             let mut result = vec![Line::from("")];
