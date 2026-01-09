@@ -1,0 +1,57 @@
+[package]
+name = "mdv"
+version = "0.1.0"
+edition = "2021"
+authors = ["cinnamobot"]
+description = "Ultra-lightweight markdown viewer for terminal"
+license = "MIT"
+repository = "https://github.com/cinnamobot/markdown-viewer"
+readme = "README.md"
+keywords = ["markdown", "viewer", "terminal", "tui", "cli"]
+categories = ["command-line-utilities", "visualization"]
+
+[[bin]]
+name = "mdv"
+path = "src/main.rs"
+
+[lib]
+name = "mdv"
+path = "src/lib.rs"
+
+[dependencies]
+# TUI
+ratatui = "0.29"
+crossterm = "0.28"
+
+# マークダウンパース
+pulldown-cmark = "0.12"
+
+# シンタックスハイライト
+syntect = "5.2"
+
+# ファイル監視
+notify = "7.0"
+notify-debouncer-full = "0.4"
+
+# CLI引数パース
+clap = { version = "4.5", features = ["derive"] }
+
+# エラーハンドリング
+anyhow = "1.0"
+thiserror = "1.0"
+
+# 非同期ランタイム
+tokio = { version = "1.40", features = ["rt", "sync", "macros", "rt-multi-thread"] }
+
+# その他
+unicode-width = "0.2"
+once_cell = "1.20"
+
+[dev-dependencies]
+tempfile = "3.13"
+
+[profile.release]
+opt-level = 3
+lto = true
+codegen-units = 1
+strip = true
