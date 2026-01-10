@@ -27,8 +27,15 @@ impl App {
 
     pub fn update_document(&mut self, document: MarkdownDocument) {
         self.document = document;
+
+        // Adjust scroll_offset if it exceeds the new document length
         if self.scroll_offset >= self.document.parsed_lines.len() {
             self.scroll_offset = self.document.parsed_lines.len().saturating_sub(1);
+        }
+
+        // Adjust toc_selected if it exceeds the new TOC length
+        if self.toc_selected >= self.document.toc.len() {
+            self.toc_selected = self.document.toc.len().saturating_sub(1);
         }
     }
 
