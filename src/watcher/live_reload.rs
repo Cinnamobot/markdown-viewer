@@ -17,7 +17,7 @@ pub struct LiveReloader {
 
 impl LiveReloader {
     pub fn new(path: PathBuf) -> anyhow::Result<Self> {
-        let (tx, rx) = mpsc::channel(10);
+        let (tx, rx) = mpsc::channel(100);
 
         let tx_clone = tx.clone();
         let mut debouncer = new_debouncer(
