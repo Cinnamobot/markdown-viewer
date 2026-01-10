@@ -26,7 +26,8 @@ impl CodeHighlighter {
             .themes
             .get(&self.theme_name)
             .or_else(|| THEME_SET.themes.get("base16-ocean.dark"))
-            .expect("Default theme not found")
+            .or_else(|| THEME_SET.themes.values().next())
+            .unwrap() // Safe: ThemeSet.load_defaults() always returns a non-empty theme set
     }
 
     pub fn highlight(&self, code: &str, lang: Option<&str>) -> Vec<Vec<StyledSpan>> {
