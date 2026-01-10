@@ -28,14 +28,25 @@ pub fn render(frame: &mut Frame, app: &mut App) {
 
 fn render_content(frame: &mut Frame, area: Rect, app: &App) {
     let visible_count = area.height.saturating_sub(2) as usize;
-    let visible_lines: Vec<Line> = app
-        .document
-        .parsed_lines
-        .iter()
-        .skip(app.scroll_offset)
-        .take(visible_count)
-        .flat_map(|line| parsed_line_to_ratatui_lines(line))
-        .collect();
+
+    // Handle empty document
+    let visible_lines: Vec<Line> = if app.document.parsed_lines.is_empty() {
+        vec![
+            Line::from(""),
+            Line::from(Span::styled(
+                "  (Empty document)",
+                Style::default().fg(Color::DarkGray),
+            )),
+        ]
+    } else {
+        app.document
+            .parsed_lines
+            .iter()
+            .skip(app.scroll_offset)
+            .take(visible_count)
+            .flat_map(|line| parsed_line_to_ratatui_lines(line))
+            .collect()
+    };
 
     let title = format!(" {} ", app.document.path.display());
     let paragraph = Paragraph::new(visible_lines)
@@ -46,16 +57,23 @@ fn render_content(frame: &mut Frame, area: Rect, app: &App) {
 }
 
 fn render_toc(frame: &mut Frame, area: Rect, app: &mut App) {
-    let items: Vec<ListItem> = app
-        .document
-        .toc
-        .iter()
-        .map(|entry| {
-            let indent = "  ".repeat(entry.level.saturating_sub(1));
-            let content = format!("{}{}", indent, entry.title);
-            ListItem::new(content)
-        })
-        .collect();
+    // Handle empty TOC
+    let items: Vec<ListItem> = if app.document.toc.is_empty() {
+        vec![ListItem::new(Span::styled(
+            "  (No headings)",
+            Style::default().fg(Color::DarkGray),
+        ))]
+    } else {
+        app.document
+            .toc
+            .iter()
+            .map(|entry| {
+                let indent = "  ".repeat(entry.level.saturating_sub(1));
+                let content = format!("{}{}", indent, entry.title);
+                ListItem::new(content)
+            })
+            .collect()
+    };
 
     let list = List::new(items)
         .block(
@@ -71,7 +89,10 @@ fn render_toc(frame: &mut Frame, area: Rect, app: &mut App) {
         .highlight_symbol(">> ");
 
     let mut list_state = ListState::default();
-    list_state.select(Some(app.toc_selected));
+    // Only select if TOC is not empty
+    if !app.document.toc.is_empty() {
+        list_state.select(Some(app.toc_selected));
+    }
 
     frame.render_stateful_widget(list, area, &mut list_state);
 }
