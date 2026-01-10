@@ -2,6 +2,18 @@
 
 このプロジェクトへの主要な変更はここに記録されます。
 
+## [Unreleased]
+
+### 🐛 バグ修正
+
+- **[CRITICAL]** シンタックスハイライトのテーマが見つからない場合にアプリケーションがクラッシュする問題を修正 ([#4](https://github.com/Cinnamobot/markdown-viewer/issues/4), [#10](https://github.com/Cinnamobot/markdown-viewer/pull/10))
+  - フォールバック処理を追加し、利用可能な任意のテーマを使用するように改善
+- **[CRITICAL]** ライブリロード時にTOC（目次）の選択インデックスが範囲外になりパニックする問題を修正 ([#9](https://github.com/Cinnamobot/markdown-viewer/issues/9), [#11](https://github.com/Cinnamobot/markdown-viewer/pull/11))
+  - ファイル変更で見出しが減少した場合に自動的に調整されるように修正
+- ライブリロードのチャネルバッファサイズを10→100に増加し、高頻度のファイル変更に対応 ([#7](https://github.com/Cinnamobot/markdown-viewer/issues/7), [#12](https://github.com/Cinnamobot/markdown-viewer/pull/12))
+- 空のドキュメントや空のTOCで適切なメッセージを表示するように改善 ([#7](https://github.com/Cinnamobot/markdown-viewer/issues/7), [#13](https://github.com/Cinnamobot/markdown-viewer/pull/13))
+- 不正なMarkdownで生成される空のテーブルに対する境界値チェックを追加 ([#7](https://github.com/Cinnamobot/markdown-viewer/issues/7), [#14](https://github.com/Cinnamobot/markdown-viewer/pull/14))
+
 ## [0.1.0] - 2026-01-10
 
 ### ✨ 機能追加
