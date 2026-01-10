@@ -336,6 +336,18 @@ fn render_table(
     rows: &[Vec<String>],
     alignments: &[Alignment],
 ) -> Vec<Line<'static>> {
+    // Handle empty table (malformed Markdown)
+    if headers.is_empty() {
+        return vec![
+            Line::from(""),
+            Line::from(Span::styled(
+                "  (Empty table)",
+                Style::default().fg(Color::DarkGray),
+            )),
+            Line::from(""),
+        ];
+    }
+
     let border_style = Style::default().fg(Color::Blue);
     let header_style = Style::default()
         .fg(Color::Cyan)
