@@ -877,29 +877,27 @@ pub fn truncate_with_markers(text: &str, max_visible: usize) -> String {
             result.push_str(close_marker);
             i += close_marker.len();
             in_code = false;
-        } else {
-            if let Some(ch) = text[i..].chars().next() {
-                let char_width = match ch.width() {
-                    Some(w) => w,
-                    None => {
-                        if ch.is_control() {
-                            0
-                        } else {
-                            1
-                        }
+        } else if let Some(ch) = text[i..].chars().next() {
+            let char_width = match ch.width() {
+                Some(w) => w,
+                None => {
+                    if ch.is_control() {
+                        0
+                    } else {
+                        1
                     }
-                };
-
-                if current_visible_width + char_width > max_visible {
-                    break;
                 }
+            };
 
-                result.push(ch);
-                current_visible_width += char_width;
-                i += ch.len_utf8();
-            } else {
+            if current_visible_width + char_width > max_visible {
                 break;
             }
+
+            result.push(ch);
+            current_visible_width += char_width;
+            i += ch.len_utf8();
+        } else {
+            break;
         }
     }
 
