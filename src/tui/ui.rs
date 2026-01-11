@@ -211,7 +211,7 @@ fn render_content<'a>(frame: &mut Frame, area: Rect, app: &App<'a>, theme: &UiTh
             .iter()
             .skip(app.scroll_offset)
             .take(visible_count)
-            .flat_map(|line| parsed_line_to_ratatui_lines(line, theme, area.width as usize))
+            .flat_map(|line| parsed_line_to_ratatui_lines(line, &theme, area.width as usize))
             .collect()
     };
 
