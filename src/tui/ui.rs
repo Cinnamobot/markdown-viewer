@@ -1,5 +1,6 @@
 use crate::markdown::{Alignment, ParsedLine};
 use crate::tui::app::App;
+use crate::tui::UiTheme;
 use ratatui::{
     layout::{Constraint, Direction, Layout, Rect},
     style::{Color, Modifier, Style},
@@ -8,25 +9,191 @@ use ratatui::{
     Frame,
 };
 use syntect::highlighting::Color as SyntectColor;
+use unicode_width::UnicodeWidthChar;
 
-pub fn render(frame: &mut Frame, app: &mut App) {
-    let size = frame.area();
-    app.viewport_height = size.height.saturating_sub(2) as usize;
-
-    if app.show_toc {
-        let chunks = Layout::default()
-            .direction(Direction::Horizontal)
-            .constraints([Constraint::Percentage(70), Constraint::Percentage(30)])
-            .split(size);
-
-        render_content(frame, chunks[0], app);
-        render_toc(frame, chunks[1], app);
-    } else {
-        render_content(frame, size, app);
+/// Calculate optimal TOC width based on content and terminal size
+pub fn calculate_toc_width<'a>(app: &App<'a>, theme: &UiTheme, terminal_width: u16) -> u16 {
+    if app.document.toc.is_empty() {
+        return 20; // Minimum width for empty TOC
     }
+
+    // Calculate maximum heading length including indentation
+    let max_heading_len = app
+        .document
+        .toc
+        .iter()
+        .map(|entry| {
+            let indent = "  ".repeat(entry.level.saturating_sub(1));
+            visible_text_len(&format!("{}{}>> ", indent, entry.title)) + 4 // padding and border
+        })
+        .max()
+        .unwrap_or(20);
+
+    // TOC title length
+    let title_len = " Table of Contents ".len() + 4; // borders
+
+    let content_len = max_heading_len.max(title_len);
+
+    // Limit to reasonable bounds based on theme setting
+    let max_percent = theme.layout.toc_width_percent() as usize;
+    let max_toc_width = (terminal_width as usize * max_percent / 100).max(20);
+    let min_toc_width = 20;
+
+    (content_len as u16).clamp(min_toc_width, max_toc_width as u16)
 }
 
-fn render_content(frame: &mut Frame, area: Rect, app: &App) {
+/// Improved word wrapping function with Unicode support
+fn wrap_text(text: &str, max_width: usize) -> Vec<String> {
+    if text.is_empty() {
+        return vec![String::new()];
+    }
+
+    let mut result = Vec::new();
+    let mut current_line = String::new();
+
+    // Split by whitespace, but preserve spaces within words
+    for word in text.split_whitespace() {
+        let word_len = visible_text_len(word);
+        let current_len = visible_text_len(&current_line);
+
+        if current_len + word_len < max_width || current_line.is_empty() {
+            // Word fits on current line
+            if !current_line.is_empty() {
+                current_line.push(' ');
+            }
+            current_line.push_str(word);
+        } else {
+            // Word doesn't fit
+            if !current_line.is_empty() {
+                result.push(current_line);
+                current_line = String::new();
+            }
+
+            // Handle very long words by breaking them
+            if word_len > max_width {
+                let mut remaining = word;
+                while !remaining.is_empty() {
+                    let mut chunk_len = 0;
+                    let mut chunk = String::new();
+
+                    for ch in remaining.chars() {
+                        let ch_width = ch.width().unwrap_or(1);
+                        if chunk_len + ch_width > max_width {
+                            break;
+                        }
+                        chunk.push(ch);
+                        chunk_len += ch_width;
+                    }
+
+                    if chunk.is_empty() {
+                        // Single character is too wide, add anyway
+                        chunk.push(remaining.chars().next().unwrap());
+                        remaining = &remaining[chunk.len()..];
+                    } else {
+                        remaining = &remaining[chunk.len()..];
+                    }
+
+                    result.push(chunk);
+                }
+            } else {
+                current_line = word.to_string();
+            }
+        }
+    }
+
+    if !current_line.is_empty() {
+        result.push(current_line);
+    }
+
+    if result.is_empty() {
+        result.push(String::new());
+    }
+
+    result
+}
+
+/// Render status bar
+fn render_status_bar<'a>(
+    frame: &mut Frame,
+    area: Rect,
+    app: &App<'a>,
+    theme_manager: &'a crate::tui::ThemeManager,
+) {
+    let theme = &theme_manager.current_theme();
+    let status_text = if app.search_mode {
+        format!(
+            " Search: {} | {}/{} matches ",
+            app.search_query,
+            if app.search_results.is_empty() {
+                0
+            } else {
+                app.current_search_index + 1
+            },
+            app.search_results.len()
+        )
+    } else {
+        format!(
+            " {} | Line {}/{} | Mode: {} | Theme: {} ",
+            app.document.path.display(),
+            app.current_line + 1,
+            app.document.parsed_lines.len(),
+            if app.show_toc { "TOC" } else { "View" },
+            theme_manager.current_theme_name()
+        )
+    };
+
+    let status_bar = Paragraph::new(status_text)
+        .style(
+            Style::default()
+                .fg(theme.status_bar.foreground())
+                .bg(theme.status_bar.background()),
+        )
+        .alignment(ratatui::layout::Alignment::Center);
+
+    let status_area = Rect {
+        x: area.x,
+        y: area.y + area.height - 1,
+        width: area.width,
+        height: 1,
+    };
+
+    frame.render_widget(status_bar, status_area);
+}
+
+/// Render the TUI interface
+pub fn render<'a>(
+    frame: &mut Frame,
+    app: &mut App<'a>,
+    theme_manager: &'a crate::tui::ThemeManager,
+) {
+    let size = frame.area();
+    app.viewport_height = size.height.saturating_sub(3) as usize; // -1 for status bar, -2 for borders
+    let theme = &theme_manager.current_theme();
+
+    if app.show_toc {
+        // Calculate TOC width based on content (with caching)
+        let toc_width = app.get_toc_width(&theme, size.width);
+        let content_width = size.width.saturating_sub(toc_width);
+
+        let chunks = Layout::default()
+            .direction(Direction::Horizontal)
+            .constraints([
+                Constraint::Length(content_width),
+                Constraint::Length(toc_width),
+            ])
+            .split(size);
+
+        render_content(frame, chunks[0], app, &theme);
+        render_toc(frame, chunks[1], app, &theme);
+    } else {
+        render_content(frame, size, app, &theme);
+    }
+
+    // Render status bar at the bottom
+    render_status_bar(frame, size, app, theme_manager);
+}
+
+fn render_content<'a>(frame: &mut Frame, area: Rect, app: &App<'a>, theme: &UiTheme) {
     let visible_count = area.height.saturating_sub(2) as usize;
 
     // Handle empty document
@@ -35,7 +202,7 @@ fn render_content(frame: &mut Frame, area: Rect, app: &App) {
             Line::from(""),
             Line::from(Span::styled(
                 "  (Empty document)",
-                Style::default().fg(Color::DarkGray),
+                Style::default().fg(theme.text.muted()),
             )),
         ]
     } else {
@@ -44,7 +211,7 @@ fn render_content(frame: &mut Frame, area: Rect, app: &App) {
             .iter()
             .skip(app.scroll_offset)
             .take(visible_count)
-            .flat_map(|line| parsed_line_to_ratatui_lines(line))
+            .flat_map(|line| parsed_line_to_ratatui_lines(line, &theme, area.width as usize))
             .collect()
     };
 
@@ -56,12 +223,12 @@ fn render_content(frame: &mut Frame, area: Rect, app: &App) {
     frame.render_widget(paragraph, area);
 }
 
-fn render_toc(frame: &mut Frame, area: Rect, app: &mut App) {
+fn render_toc<'a>(frame: &mut Frame, area: Rect, app: &mut App<'a>, theme: &UiTheme) {
     // Handle empty TOC
     let items: Vec<ListItem> = if app.document.toc.is_empty() {
         vec![ListItem::new(Span::styled(
             "  (No headings)",
-            Style::default().fg(Color::DarkGray),
+            Style::default().fg(theme.text.muted()),
         ))]
     } else {
         app.document
@@ -83,7 +250,8 @@ fn render_toc(frame: &mut Frame, area: Rect, app: &mut App) {
         )
         .highlight_style(
             Style::default()
-                .bg(Color::DarkGray)
+                .fg(theme.toc.selected())
+                .bg(theme.toc.highlight_bg())
                 .add_modifier(Modifier::BOLD),
         )
         .highlight_symbol(">> ");
@@ -97,41 +265,45 @@ fn render_toc(frame: &mut Frame, area: Rect, app: &mut App) {
     frame.render_stateful_widget(list, area, &mut list_state);
 }
 
-fn parsed_line_to_ratatui_lines(line: &ParsedLine) -> Vec<Line<'static>> {
+fn parsed_line_to_ratatui_lines(
+    line: &ParsedLine,
+    theme: &crate::tui::UiTheme,
+    area_width: usize,
+) -> Vec<Line<'static>> {
     match line {
         ParsedLine::Heading { level, text, .. } => {
             let (style, prefix, suffix) = match level {
                 1 => (
                     Style::default()
-                        .fg(Color::Cyan)
+                        .fg(theme.heading.h1())
                         .add_modifier(Modifier::BOLD | Modifier::UNDERLINED),
                     "╔══ ",
                     " ══╗",
                 ),
                 2 => (
                     Style::default()
-                        .fg(Color::LightCyan)
+                        .fg(theme.heading.h2())
                         .add_modifier(Modifier::BOLD),
                     "▌ ",
                     "",
                 ),
                 3 => (
                     Style::default()
-                        .fg(Color::Blue)
+                        .fg(theme.heading.h3())
                         .add_modifier(Modifier::BOLD),
                     "▸ ",
                     "",
                 ),
                 4 => (
                     Style::default()
-                        .fg(Color::LightBlue)
+                        .fg(theme.heading.h4())
                         .add_modifier(Modifier::BOLD),
                     "  • ",
                     "",
                 ),
                 _ => (
                     Style::default()
-                        .fg(Color::Gray)
+                        .fg(theme.heading.h6())
                         .add_modifier(Modifier::BOLD),
                     "    ◦ ",
                     "",
@@ -150,13 +322,15 @@ fn parsed_line_to_ratatui_lines(line: &ParsedLine) -> Vec<Line<'static>> {
             highlighted,
         } => {
             let lang_display = lang.as_deref().unwrap_or("text");
-            let border_style = Style::default().fg(Color::DarkGray);
+            let border_style = Style::default().fg(theme.code.border());
             let lang_style = Style::default()
-                .fg(Color::Magenta)
+                .fg(theme.code.lang_label())
                 .add_modifier(Modifier::BOLD);
 
-            // Fixed width for code blocks
-            let block_width: usize = 80;
+            // Responsive width for code blocks based on theme setting
+            let available_width = area_width.saturating_sub(4); // Account for borders
+            let percent = theme.layout.code_block_width_percent() as usize;
+            let block_width: usize = (available_width * percent / 100).clamp(40, 120);
 
             // Header
             let lang_text = format!("[ {lang_display} ]");
@@ -229,17 +403,29 @@ fn parsed_line_to_ratatui_lines(line: &ParsedLine) -> Vec<Line<'static>> {
             if content.trim().is_empty() {
                 vec![Line::from("")]
             } else {
-                let mut result: Vec<Line> = content
-                    .split('\n')
-                    .map(|line| {
-                        // インラインコードを検出してハイライト
-                        if line.contains("⟨INLINE_CODE⟩") {
-                            parse_inline_code(line)
-                        } else {
-                            Line::from(Span::raw(line.to_string()))
+                let mut result: Vec<Line> = Vec::new();
+
+                for line in content.split('\n') {
+                    if theme.layout.wrap_text() && !line.is_empty() {
+                        // Word wrapping for long lines
+                        let wrapped_lines = wrap_text(line, area_width.saturating_sub(4));
+                        for wrapped_line in wrapped_lines {
+                            if wrapped_line.contains("⟨INLINE_CODE⟩") {
+                                result.push(parse_inline_code(&wrapped_line, theme));
+                            } else {
+                                result.push(Line::from(Span::raw(wrapped_line)));
+                            }
                         }
-                    })
-                    .collect();
+                    } else {
+                        // No wrapping
+                        if line.contains("⟨INLINE_CODE⟩") {
+                            result.push(parse_inline_code(line, theme));
+                        } else {
+                            result.push(Line::from(Span::raw(line.to_string())));
+                        }
+                    }
+                }
+
                 // 段落の後に空行を追加
                 result.push(Line::from(""));
                 result
@@ -256,19 +442,19 @@ fn parsed_line_to_ratatui_lines(line: &ParsedLine) -> Vec<Line<'static>> {
                 Some(true) => (
                     format!("{indent_str}[✓] "),
                     Style::default()
-                        .fg(Color::Green)
+                        .fg(theme.list.checked())
                         .add_modifier(Modifier::BOLD),
                 ),
                 Some(false) => (
                     format!("{indent_str}[ ] "),
                     Style::default()
-                        .fg(Color::Yellow)
+                        .fg(theme.list.unchecked())
                         .add_modifier(Modifier::BOLD),
                 ),
                 None => (
                     format!("{indent_str}● "),
                     Style::default()
-                        .fg(Color::Green)
+                        .fg(theme.list.bullet())
                         .add_modifier(Modifier::BOLD),
                 ),
             };
@@ -277,7 +463,7 @@ fn parsed_line_to_ratatui_lines(line: &ParsedLine) -> Vec<Line<'static>> {
 
             // Check for inline code markers
             if content.contains("⟨INLINE_CODE⟩") {
-                spans.extend(parse_inline_code_to_spans(content, Style::default()));
+                spans.extend(parse_inline_code_to_spans(content, Style::default(), theme));
             } else {
                 spans.push(Span::raw(content.clone()));
             }
@@ -285,9 +471,9 @@ fn parsed_line_to_ratatui_lines(line: &ParsedLine) -> Vec<Line<'static>> {
             vec![Line::from(spans)]
         }
         ParsedLine::BlockQuote { content } => {
-            let border_style = Style::default().fg(Color::Yellow);
+            let border_style = Style::default().fg(theme.blockquote.border());
             let text_style = Style::default()
-                .fg(Color::LightYellow)
+                .fg(theme.blockquote.text())
                 .add_modifier(Modifier::ITALIC);
 
             let lines: Vec<Line> = content
@@ -297,7 +483,7 @@ fn parsed_line_to_ratatui_lines(line: &ParsedLine) -> Vec<Line<'static>> {
 
                     // Check for inline code markers
                     if line.contains("⟨INLINE_CODE⟩") {
-                        spans.extend(parse_inline_code_to_spans(line, text_style));
+                        spans.extend(parse_inline_code_to_spans(line, text_style, theme));
                     } else {
                         spans.push(Span::styled(line.to_string(), text_style));
                     }
@@ -317,11 +503,36 @@ fn parsed_line_to_ratatui_lines(line: &ParsedLine) -> Vec<Line<'static>> {
             use crate::markdown::parser::AlertType;
 
             let (icon, label, border_color, text_color) = match alert_type {
-                AlertType::Note => ("ℹ", "NOTE", Color::Blue, Color::LightBlue),
-                AlertType::Tip => ("💡", "TIP", Color::Green, Color::LightGreen),
-                AlertType::Important => ("❗", "IMPORTANT", Color::Magenta, Color::LightMagenta),
-                AlertType::Warning => ("⚠", "WARNING", Color::Yellow, Color::LightYellow),
-                AlertType::Caution => ("🛑", "CAUTION", Color::Red, Color::LightRed),
+                AlertType::Note => (
+                    "ℹ",
+                    "NOTE",
+                    theme.alert.note.border(),
+                    theme.alert.note.text(),
+                ),
+                AlertType::Tip => (
+                    "💡",
+                    "TIP",
+                    theme.alert.tip.border(),
+                    theme.alert.tip.text(),
+                ),
+                AlertType::Important => (
+                    "❗",
+                    "IMPORTANT",
+                    theme.alert.important.border(),
+                    theme.alert.important.text(),
+                ),
+                AlertType::Warning => (
+                    "⚠",
+                    "WARNING",
+                    theme.alert.warning.border(),
+                    theme.alert.warning.text(),
+                ),
+                AlertType::Caution => (
+                    "🛑",
+                    "CAUTION",
+                    theme.alert.caution.border(),
+                    theme.alert.caution.text(),
+                ),
             };
 
             let border_style = Style::default()
@@ -329,12 +540,28 @@ fn parsed_line_to_ratatui_lines(line: &ParsedLine) -> Vec<Line<'static>> {
                 .add_modifier(Modifier::BOLD);
             let text_style = Style::default().fg(text_color);
 
+            // Calculate dynamic width based on content
+            let header_prefix_len = visible_text_len(&format!("┏━━ {icon} {label} "));
+            let footer_prefix_len = visible_text_len("┗");
+            let side_border_len = visible_text_len("┃ ");
+
+            let mut max_content_len = 0;
+            for line in content.split('\n') {
+                let line_len = visible_text_len(line);
+                max_content_len = max_content_len.max(line_len);
+            }
+
+            let total_width = (header_prefix_len + max_content_len + side_border_len)
+                .max(footer_prefix_len + 60)
+                .min(area_width.saturating_sub(4));
+            let border_fill_len = total_width.saturating_sub(header_prefix_len);
+
             let mut result = vec![
                 Line::from(""),
                 Line::from(vec![
                     Span::styled("┏━━ ", border_style),
                     Span::styled(format!("{icon} {label} "), border_style),
-                    Span::styled("━".repeat(60), border_style),
+                    Span::styled("━".repeat(border_fill_len), border_style),
                 ]),
             ];
 
@@ -342,18 +569,31 @@ fn parsed_line_to_ratatui_lines(line: &ParsedLine) -> Vec<Line<'static>> {
                 let mut spans = vec![Span::styled("┃ ", border_style)];
 
                 if line.contains("⟨INLINE_CODE⟩") {
-                    spans.extend(parse_inline_code_to_spans(line, text_style));
+                    spans.extend(parse_inline_code_to_spans(line, text_style, theme));
                 } else {
                     spans.push(Span::styled(line.to_string(), text_style));
                 }
 
+                // Pad to align with border
+                let current_len = visible_text_len(
+                    &line
+                        .replace("⟨INLINE_CODE⟩", "")
+                        .replace("⟨/INLINE_CODE⟩", ""),
+                );
+                let padding_needed = max_content_len.saturating_sub(current_len);
+                if padding_needed > 0 {
+                    spans.push(Span::raw(" ".repeat(padding_needed)));
+                }
+
+                spans.push(Span::styled(" ", border_style)); // Right padding
                 result.push(Line::from(spans));
             }
 
-            result.push(Line::from(Span::styled(
-                "┗━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━",
-                border_style,
-            )));
+            let footer_line = format!(
+                "┗{}",
+                "━".repeat(total_width.saturating_sub(footer_prefix_len))
+            );
+            result.push(Line::from(Span::styled(footer_line, border_style)));
             result.push(Line::from(""));
             result
         }
@@ -361,30 +601,39 @@ fn parsed_line_to_ratatui_lines(line: &ParsedLine) -> Vec<Line<'static>> {
             headers,
             rows,
             alignments,
-        } => render_table(headers, rows, alignments),
-        ParsedLine::HorizontalRule => vec![
-            Line::from(""),
-            Line::from(Span::styled(
-                "━".repeat(80),
-                Style::default().fg(Color::Cyan),
-            )),
-            Line::from(""),
-        ],
+        } => render_table(headers, rows, alignments, theme, area_width),
+        ParsedLine::HorizontalRule => {
+            let rule_width = area_width.saturating_sub(4).min(120); // Responsive, max 120
+            vec![
+                Line::from(""),
+                Line::from(Span::styled(
+                    "━".repeat(rule_width),
+                    Style::default().fg(theme.border.primary()),
+                )),
+                Line::from(""),
+            ]
+        }
         ParsedLine::Image { alt_text, url } => vec![
             Line::from(""),
             Line::from(vec![
-                Span::styled("[Image: ".to_string(), Style::default().fg(Color::Yellow)),
+                Span::styled(
+                    "[Image: ".to_string(),
+                    Style::default().fg(theme.border.primary()),
+                ),
                 Span::styled(
                     url.to_string(),
                     Style::default()
-                        .fg(Color::Cyan)
+                        .fg(theme.text.secondary())
                         .add_modifier(Modifier::UNDERLINED),
                 ),
-                Span::styled("]".to_string(), Style::default().fg(Color::Yellow)),
+                Span::styled("]".to_string(), Style::default().fg(theme.border.primary())),
             ]),
             Line::from(vec![
-                Span::styled("Alt: ".to_string(), Style::default().fg(Color::DarkGray)),
-                Span::styled(alt_text.to_string(), Style::default().fg(Color::Gray)),
+                Span::styled("Alt: ".to_string(), Style::default().fg(theme.text.muted())),
+                Span::styled(
+                    alt_text.to_string(),
+                    Style::default().fg(theme.text.secondary()),
+                ),
             ]),
             Line::from(""),
         ],
@@ -400,6 +649,8 @@ fn render_table(
     headers: &[String],
     rows: &[Vec<String>],
     alignments: &[Alignment],
+    theme: &UiTheme,
+    area_width: usize,
 ) -> Vec<Line<'static>> {
     // Handle empty table (malformed Markdown)
     if headers.is_empty() {
@@ -407,17 +658,17 @@ fn render_table(
             Line::from(""),
             Line::from(Span::styled(
                 "  (Empty table)",
-                Style::default().fg(Color::DarkGray),
+                Style::default().fg(theme.text.muted()),
             )),
             Line::from(""),
         ];
     }
 
-    let border_style = Style::default().fg(Color::Blue);
+    let border_style = Style::default().fg(theme.table.border());
     let header_style = Style::default()
-        .fg(Color::Cyan)
+        .fg(theme.table.header())
         .add_modifier(Modifier::BOLD);
-    let cell_style = Style::default().fg(Color::White);
+    let cell_style = Style::default().fg(theme.table.cell());
 
     // 各列の最大幅を計算（マーカーを除外した可視文字数）
     let mut col_widths: Vec<usize> = headers.iter().map(|h| visible_text_len(h)).collect();
@@ -431,10 +682,29 @@ fn render_table(
             }
         }
     }
-    // 最小幅を3、最大幅を30に制限
-    col_widths.iter_mut().for_each(|w| {
-        *w = (*w).clamp(3, 30);
-    });
+
+    // Responsive column widths: distribute available space
+    let total_content_width: usize = col_widths.iter().sum::<usize>() + col_widths.len() * 3; // +3 for " │ " padding
+    let available_width = area_width.saturating_sub(4); // Account for outer borders
+    let min_col_width = 3;
+    let max_col_width = 50; // Increased from 30
+
+    if total_content_width <= available_width {
+        // Content fits, use natural widths but respect minimums
+        col_widths.iter_mut().for_each(|w| {
+            *w = (*w).max(min_col_width).min(max_col_width);
+        });
+    } else {
+        // Content too wide, scale down proportionally
+        let total_desired: usize = col_widths.iter().sum();
+        let scale_factor = available_width as f64 / (total_desired + col_widths.len() * 3) as f64;
+
+        for w in &mut col_widths {
+            *w = ((*w as f64 * scale_factor) as usize)
+                .max(min_col_width)
+                .min(max_col_width);
+        }
+    }
 
     let mut lines = Vec::new();
     lines.push(Line::from(""));
@@ -466,7 +736,7 @@ fn render_table(
 
             // インラインコードマーカーをチェック
             if aligned.contains("⟨INLINE_CODE⟩") {
-                cell_spans.extend(parse_inline_code_to_spans(&aligned, header_style));
+                cell_spans.extend(parse_inline_code_to_spans(&aligned, header_style, theme));
             } else {
                 cell_spans.push(Span::styled(aligned, header_style));
             }
@@ -505,7 +775,7 @@ fn render_table(
 
                 // インラインコードマーカーをチェック
                 if aligned.contains("⟨INLINE_CODE⟩") {
-                    cell_spans.extend(parse_inline_code_to_spans(&aligned, cell_style));
+                    cell_spans.extend(parse_inline_code_to_spans(&aligned, cell_style, theme));
                 } else {
                     cell_spans.push(Span::styled(aligned, cell_style));
                 }
@@ -561,23 +831,27 @@ pub fn visible_text_len(text: &str) -> usize {
 
 fn align_text(text: &str, width: usize, alignment: Alignment) -> String {
     let text_len = visible_text_len(text);
-    if text_len >= width {
+    let content = if text_len > width {
         // 長すぎる場合は切り詰める - マーカーを保持しながら可視文字数で切り詰め
         truncate_with_markers(text, width)
     } else {
-        let padding = width - text_len;
-        match alignment {
-            Alignment::Left | Alignment::None => {
-                format!("{text}{}", " ".repeat(padding))
-            }
-            Alignment::Right => {
-                format!("{}{text}", " ".repeat(padding))
-            }
-            Alignment::Center => {
-                let left_pad = padding / 2;
-                let right_pad = padding - left_pad;
-                format!("{}{text}{}", " ".repeat(left_pad), " ".repeat(right_pad))
-            }
+        text.to_string()
+    };
+
+    let content_len = visible_text_len(&content);
+    let padding = width.saturating_sub(content_len);
+
+    match alignment {
+        Alignment::Left | Alignment::None => {
+            format!("{content}{}", " ".repeat(padding))
+        }
+        Alignment::Right => {
+            format!("{}{content}", " ".repeat(padding))
+        }
+        Alignment::Center => {
+            let left_pad = padding / 2;
+            let right_pad = padding - left_pad;
+            format!("{}{content}{}", " ".repeat(left_pad), " ".repeat(right_pad))
         }
     }
 }
@@ -643,7 +917,11 @@ pub fn truncate_with_markers(text: &str, max_visible: usize) -> String {
 }
 
 // テーブルセル用のインラインコードパーサー（ベーススタイルを保持）
-fn parse_inline_code_to_spans(text: &str, base_style: Style) -> Vec<Span<'static>> {
+fn parse_inline_code_to_spans(
+    text: &str,
+    base_style: Style,
+    theme: &crate::tui::UiTheme,
+) -> Vec<Span<'static>> {
     let mut spans = Vec::new();
     let mut current = String::new();
 
@@ -682,8 +960,8 @@ fn parse_inline_code_to_spans(text: &str, base_style: Style) -> Vec<Span<'static
                 spans.push(Span::styled(
                     code_content,
                     Style::default()
-                        .fg(Color::Yellow)
-                        .bg(Color::DarkGray)
+                        .fg(theme.inline_code.foreground())
+                        .bg(theme.inline_code.background())
                         .add_modifier(Modifier::BOLD),
                 ));
             } else {
@@ -707,7 +985,7 @@ fn parse_inline_code_to_spans(text: &str, base_style: Style) -> Vec<Span<'static
     spans
 }
 
-fn parse_inline_code(text: &str) -> Line<'static> {
+fn parse_inline_code(text: &str, theme: &UiTheme) -> Line<'static> {
     let mut spans = Vec::new();
     let mut current = String::new();
 
@@ -749,8 +1027,8 @@ fn parse_inline_code(text: &str) -> Line<'static> {
                 spans.push(Span::styled(
                     code_content,
                     Style::default()
-                        .fg(Color::Yellow)
-                        .bg(Color::DarkGray)
+                        .fg(theme.inline_code.foreground())
+                        .bg(theme.inline_code.background())
                         .add_modifier(Modifier::BOLD),
                 ));
             } else {
