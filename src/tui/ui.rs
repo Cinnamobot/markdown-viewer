@@ -856,59 +856,53 @@ fn align_text(text: &str, width: usize, alignment: Alignment) -> String {
     }
 }
 
-// マーカーを保持しながらテキストを切り詰める
+// マーカーを保持しながらテキストを切り詰める（O(n)アルゴリズム）
 pub fn truncate_with_markers(text: &str, max_visible: usize) -> String {
-    use unicode_width::UnicodeWidthChar;
-
     let open_marker = "⟨INLINE_CODE⟩";
     let close_marker = "⟨/INLINE_CODE⟩";
 
-    let mut result = String::new();
+    let mut result = String::with_capacity(text.len().min(max_visible * 2));
     let mut current_visible_width = 0;
     let mut i = 0;
     let mut in_code = false;
-    let chars: Vec<char> = text.chars().collect();
 
-    while i < chars.len() {
-        let remaining: String = chars[i..].iter().collect();
+    while i < text.len() {
+        let remaining = &text[i..];
 
         if remaining.starts_with(open_marker) {
-            // Add marker without counting width
             result.push_str(open_marker);
-            i += open_marker.chars().count();
+            i += open_marker.len();
             in_code = true;
         } else if remaining.starts_with(close_marker) {
-            // Add marker without counting width
             result.push_str(close_marker);
-            i += close_marker.chars().count();
+            i += close_marker.len();
             in_code = false;
         } else {
-            // Check character width
-            let ch = chars[i];
-            // Use width() instead of width_cjk()
-            let char_width = match ch.width() {
-                Some(w) => w,
-                None => {
-                    // 制御文字は表示しない
-                    if ch.is_control() {
-                        0
-                    } else {
-                        1
+            if let Some(ch) = text[i..].chars().next() {
+                let char_width = match ch.width() {
+                    Some(w) => w,
+                    None => {
+                        if ch.is_control() {
+                            0
+                        } else {
+                            1
+                        }
                     }
-                }
-            };
+                };
 
-            if current_visible_width + char_width > max_visible {
+                if current_visible_width + char_width > max_visible {
+                    break;
+                }
+
+                result.push(ch);
+                current_visible_width += char_width;
+                i += ch.len_utf8();
+            } else {
                 break;
             }
-
-            result.push(ch);
-            current_visible_width += char_width;
-            i += 1;
         }
     }
 
-    // If we stopped inside a code block, add the closing marker
     if in_code {
         result.push_str(close_marker);
     }
@@ -1058,7 +1052,7 @@ fn parse_inline_code(text: &str, theme: &UiTheme) -> Line<'static> {
 #[cfg(test)]
 mod test_inline_code_spans {
     use super::*;
-    use ratatui::style::{Color, Style};
+    use ratatui::style::{Color, Modifier, Style};
 
     #[test]
     fn test_parse_inline_code_to_spans_basic() {
@@ -1069,8 +1063,11 @@ mod test_inline_code_spans {
 
         assert_eq!(spans.len(), 1);
         assert_eq!(spans[0].content, "test");
-        // Color depends on theme, so we just check it's set
-        assert!(spans[0].style.fg.is_some());
+        let expected_style = Style::default()
+            .fg(theme.inline_code.foreground())
+            .bg(theme.inline_code.background())
+            .add_modifier(Modifier::BOLD);
+        assert_eq!(spans[0].style, expected_style);
     }
 
     #[test]
@@ -1082,7 +1079,16 @@ mod test_inline_code_spans {
 
         assert_eq!(spans.len(), 3);
         assert_eq!(spans[0].content, "normal ");
+        assert_eq!(spans[0].style, base_style);
+
         assert_eq!(spans[1].content, "code");
+        let expected_code_style = Style::default()
+            .fg(theme.inline_code.foreground())
+            .bg(theme.inline_code.background())
+            .add_modifier(Modifier::BOLD);
+        assert_eq!(spans[1].style, expected_code_style);
+
         assert_eq!(spans[2].content, " more");
+        assert_eq!(spans[2].style, base_style);
     }
 }

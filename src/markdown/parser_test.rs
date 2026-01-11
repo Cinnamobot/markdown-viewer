@@ -189,4 +189,155 @@ mod tests {
         let arrow_trunc = truncate_with_markers(arrow_text, 4);
         assert_eq!(arrow_trunc, "j / ");
     }
+
+    #[test]
+    fn test_empty_document() {
+        let markdown = "";
+        let highlighter = CodeHighlighter::new("base16-ocean.dark".to_string());
+        let doc =
+            MarkdownDocument::parse(PathBuf::from("test.md"), markdown.to_string(), &highlighter)
+                .unwrap();
+
+        assert!(doc.parsed_lines.is_empty());
+    }
+
+    #[test]
+    fn test_whitespace_only_document() {
+        let markdown = "   \n\n   \n";
+        let highlighter = CodeHighlighter::new("base16-ocean.dark".to_string());
+        let doc =
+            MarkdownDocument::parse(PathBuf::from("test.md"), markdown.to_string(), &highlighter)
+                .unwrap();
+
+        assert!(
+            doc.parsed_lines.is_empty()
+                || doc
+                    .parsed_lines
+                    .iter()
+                    .all(|l| matches!(l, ParsedLine::Empty))
+        );
+    }
+
+    #[test]
+    fn test_empty_markdown_elements() {
+        let highlighter = CodeHighlighter::new("base16-ocean.dark".to_string());
+
+        // Empty code block
+        let doc = MarkdownDocument::parse(
+            PathBuf::from("test.md"),
+            "```\n```".to_string(),
+            &highlighter,
+        )
+        .unwrap();
+        assert!(!doc.parsed_lines.is_empty());
+
+        // Empty heading
+        let doc = MarkdownDocument::parse(PathBuf::from("test.md"), "#".to_string(), &highlighter)
+            .unwrap();
+
+        // Empty link
+        let doc = MarkdownDocument::parse(
+            PathBuf::from("test.md"),
+            "[](url)".to_string(),
+            &highlighter,
+        )
+        .unwrap();
+    }
+
+    #[test]
+    fn test_unclosed_markdown_elements() {
+        let highlighter = CodeHighlighter::new("base16-ocean.dark".to_string());
+
+        // Unclosed code block
+        let doc = MarkdownDocument::parse(
+            PathBuf::from("test.md"),
+            "```\ncode without end".to_string(),
+            &highlighter,
+        )
+        .unwrap();
+        assert!(!doc.parsed_lines.is_empty());
+
+        // Unclosed inline code
+        let doc = MarkdownDocument::parse(
+            PathBuf::from("test.md"),
+            "text `unclosed code".to_string(),
+            &highlighter,
+        )
+        .unwrap();
+    }
+
+    #[test]
+    fn test_truncate_edge_cases() {
+        use crate::tui::ui::truncate_with_markers;
+
+        // Empty string
+        let result = truncate_with_markers("", 10);
+        assert_eq!(result, "");
+
+        // Zero max_visible
+        let result = truncate_with_markers("text", 0);
+        assert_eq!(result, "");
+
+        // Very large max_visible (larger than text)
+        let result = truncate_with_markers("short", 100);
+        assert_eq!(result, "short");
+
+        // Only markers
+        let result = truncate_with_markers("⟨INLINE_CODE⟩⟨/INLINE_CODE⟩", 10);
+        assert_eq!(result, "⟨INLINE_CODE⟩⟨/INLINE_CODE⟩");
+
+        // Marker at the end (truncated mid-marker should add closing tag)
+        let result = truncate_with_markers("text⟨INLINE_CODE⟩", 10);
+        assert_eq!(result, "text⟨INLINE_CODE⟩⟨/INLINE_CODE⟩");
+
+        // Only whitespace
+        let result = truncate_with_markers("     ", 5);
+        assert_eq!(result, "     ");
+
+        // Control characters
+        let result = truncate_with_markers("text\t\n", 10);
+        assert!(result.contains("text"));
+    }
+
+    #[test]
+    fn test_special_characters_input() {
+        let highlighter = CodeHighlighter::new("base16-ocean.dark".to_string());
+
+        // Unicode emoji
+        let doc = MarkdownDocument::parse(
+            PathBuf::from("test.md"),
+            "Hello 👋 World".to_string(),
+            &highlighter,
+        )
+        .unwrap();
+        assert!(!doc.parsed_lines.is_empty());
+
+        // Mixed RTL and LTR
+        let doc = MarkdownDocument::parse(
+            PathBuf::from("test.md"),
+            "Hello مرحبا World".to_string(),
+            &highlighter,
+        )
+        .unwrap();
+
+        // Null character (should not crash)
+        let doc = MarkdownDocument::parse(
+            PathBuf::from("test.md"),
+            "text\x00with null".to_string(),
+            &highlighter,
+        )
+        .unwrap();
+    }
+
+    #[test]
+    fn test_extremely_long_line() {
+        let highlighter = CodeHighlighter::new("base16-ocean.dark".to_string());
+        let long_line = "a".repeat(100000);
+
+        let doc =
+            MarkdownDocument::parse(PathBuf::from("test.md"), long_line.clone(), &highlighter)
+                .unwrap();
+
+        assert!(!doc.parsed_lines.is_empty());
+    }
 }

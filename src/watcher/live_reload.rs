@@ -1,3 +1,4 @@
+use crate::error::MdError;
 use notify::{RecommendedWatcher, RecursiveMode};
 use notify_debouncer_full::{new_debouncer, Debouncer, NoCache};
 use std::path::PathBuf;
@@ -19,7 +20,7 @@ pub struct LiveReloader {
 }
 
 impl LiveReloader {
-    pub fn new(path: PathBuf) -> anyhow::Result<Self> {
+    pub fn new(path: PathBuf) -> Result<Self, MdError> {
         let (tx, rx) = mpsc::channel(100);
         let cancel_token = CancellationToken::new();
 
