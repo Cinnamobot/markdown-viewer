@@ -14,12 +14,9 @@ mod tests {
 - Another parent item"#;
 
         let highlighter = CodeHighlighter::new("base16-ocean.dark".to_string());
-        let doc = MarkdownDocument::parse(
-            PathBuf::from("test.md"),
-            markdown.to_string(),
-            &highlighter,
-        )
-        .unwrap();
+        let doc =
+            MarkdownDocument::parse(PathBuf::from("test.md"), markdown.to_string(), &highlighter)
+                .unwrap();
 
         // Extract list items
         let list_items: Vec<(&usize, &String)> = doc
@@ -64,12 +61,9 @@ mod tests {
     fn test_inline_code_parsing() {
         let markdown = "Text with `inline code` here";
         let highlighter = CodeHighlighter::new("base16-ocean.dark".to_string());
-        let doc = MarkdownDocument::parse(
-            PathBuf::from("test.md"),
-            markdown.to_string(),
-            &highlighter,
-        )
-        .unwrap();
+        let doc =
+            MarkdownDocument::parse(PathBuf::from("test.md"), markdown.to_string(), &highlighter)
+                .unwrap();
 
         // Find the text line
         let text_line = doc
@@ -112,12 +106,9 @@ mod tests {
 | `k` | Scroll up |"#;
 
         let highlighter = CodeHighlighter::new("base16-ocean.dark".to_string());
-        let doc = MarkdownDocument::parse(
-            PathBuf::from("test.md"),
-            markdown.to_string(),
-            &highlighter,
-        )
-        .unwrap();
+        let doc =
+            MarkdownDocument::parse(PathBuf::from("test.md"), markdown.to_string(), &highlighter)
+                .unwrap();
 
         // Find the table
         let table = doc
@@ -148,7 +139,7 @@ mod tests {
             "First cell should contain inline code marker"
         );
         assert_eq!(rows[0][0], "⟨INLINE_CODE⟩j⟨/INLINE_CODE⟩");
-        
+
         // Second row should also have inline code markers
         assert!(
             rows[1][0].contains("⟨INLINE_CODE⟩"),
@@ -160,7 +151,7 @@ mod tests {
     #[test]
     fn test_truncate_with_markers() {
         use crate::tui::ui::{truncate_with_markers, visible_text_len};
-        
+
         let text = "⟨INLINE_CODE⟩PageDown/PageUp⟨/INLINE_CODE⟩";
         // Width 15 is exact length of visible text
         let truncated = truncate_with_markers(text, 15);
@@ -169,7 +160,7 @@ mod tests {
         // Width 10 cuts it short -> should still have closing marker
         let truncated_short = truncate_with_markers(text, 10);
         assert_eq!(truncated_short, "⟨INLINE_CODE⟩PageDown/P⟨/INLINE_CODE⟩");
-        
+
         // Check normal text mix
         let mixed = "Start ⟨INLINE_CODE⟩code⟨/INLINE_CODE⟩ end";
         let mixed_trunc = truncate_with_markers(mixed, 8); // "Start co"
@@ -183,18 +174,18 @@ mod tests {
         let cjk_trunc = truncate_with_markers(cjk_text, 8);
         assert_eq!(cjk_trunc, "日本語テ");
 
-        // Truncate CJK odd width (width 12 -> 7) 
+        // Truncate CJK odd width (width 12 -> 7)
         // "日本語" is width 6. "日本語テ" is width 8.
         // Width 7 should allow "日本語" (6) but not "テ" (adds 2 -> 8).
         let cjk_odd = truncate_with_markers(cjk_text, 7);
         assert_eq!(cjk_odd, "日本語");
-        
+
         // Test ambiguous width characters (arrows)
         // With width() (not cjk), arrows should be width 1
         let arrow_text = "j / ↓";
         // j(1) + space(1) + /(1) + space(1) + ↓(1) = 5
         assert_eq!(visible_text_len(arrow_text), 5);
-        
+
         let arrow_trunc = truncate_with_markers(arrow_text, 4);
         assert_eq!(arrow_trunc, "j / ");
     }

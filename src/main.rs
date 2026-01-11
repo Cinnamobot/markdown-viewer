@@ -100,17 +100,17 @@ async fn run_app(
                                             app.update_document(new_document);
                                         }
                                         Err(e) => {
-                                            eprintln!("Failed to parse markdown: {}", e);
+                                            eprintln!("Failed to parse markdown: {e}");
                                         }
                                     }
                                 }
                                 Err(e) => {
-                                    eprintln!("Failed to read file: {}", e);
+                                    eprintln!("Failed to read file: {e}");
                                 }
                             }
                         }
                         ReloadEvent::Error(err) => {
-                            eprintln!("File watcher error: {}", err);
+                            eprintln!("File watcher error: {err}");
                         }
                     }
                 }

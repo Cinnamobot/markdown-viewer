@@ -45,7 +45,11 @@ impl LiveReloader {
                             for event in events {
                                 if let Some(path) = event.paths.first() {
                                     // チャネルがクローズされた場合はタスクを終了
-                                    if tx.send(ReloadEvent::FileChanged(path.clone())).await.is_err() {
+                                    if tx
+                                        .send(ReloadEvent::FileChanged(path.clone()))
+                                        .await
+                                        .is_err()
+                                    {
                                         return;
                                     }
                                 }
@@ -54,7 +58,11 @@ impl LiveReloader {
                         Err(errors) => {
                             for error in errors {
                                 // チャネルがクローズされた場合はタスクを終了
-                                if tx.send(ReloadEvent::Error(error.to_string())).await.is_err() {
+                                if tx
+                                    .send(ReloadEvent::Error(error.to_string()))
+                                    .await
+                                    .is_err()
+                                {
                                     return;
                                 }
                             }

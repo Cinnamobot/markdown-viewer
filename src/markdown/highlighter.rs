@@ -39,20 +39,18 @@ impl CodeHighlighter {
         let mut highlighter = HighlightLines::new(syntax, theme);
 
         code.lines()
-            .map(|line| {
-                match highlighter.highlight_line(line, &SYNTAX_SET) {
-                    Ok(spans) => spans
-                        .into_iter()
-                        .map(|(style, text)| StyledSpan {
-                            style,
-                            text: text.to_string(),
-                        })
-                        .collect(),
-                    Err(_e) => {
-                        #[cfg(debug_assertions)]
-                        eprintln!("Syntax highlight error: {}", _e);
-                        vec![]
-                    }
+            .map(|line| match highlighter.highlight_line(line, &SYNTAX_SET) {
+                Ok(spans) => spans
+                    .into_iter()
+                    .map(|(style, text)| StyledSpan {
+                        style,
+                        text: text.to_string(),
+                    })
+                    .collect(),
+                Err(_e) => {
+                    #[cfg(debug_assertions)]
+                    eprintln!("Syntax highlight error: {_e}");
+                    vec![]
                 }
             })
             .collect()

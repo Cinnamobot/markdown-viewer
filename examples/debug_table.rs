@@ -16,9 +16,9 @@ fn main() {
         if let ParsedLine::Table { headers, rows, .. } = line {
             if headers.len() == 2 && headers[0] == "Key" {
                 println!("Keybindings Table:");
-                println!("Headers: {:?}", headers);
+                println!("Headers: {headers:?}");
                 for (i, row) in rows.iter().enumerate() {
-                    println!("Row {}: {:?}", i, row);
+                    println!("Row {i}: {row:?}");
                 }
             }
         }
