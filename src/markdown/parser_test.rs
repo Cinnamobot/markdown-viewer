@@ -232,11 +232,11 @@ mod tests {
         assert!(!doc.parsed_lines.is_empty());
 
         // Empty heading
-        let doc = MarkdownDocument::parse(PathBuf::from("test.md"), "#".to_string(), &highlighter)
+        let _doc = MarkdownDocument::parse(PathBuf::from("test.md"), "#".to_string(), &highlighter)
             .unwrap();
 
         // Empty link
-        let doc = MarkdownDocument::parse(
+        let _doc = MarkdownDocument::parse(
             PathBuf::from("test.md"),
             "[](url)".to_string(),
             &highlighter,
@@ -258,7 +258,7 @@ mod tests {
         assert!(!doc.parsed_lines.is_empty());
 
         // Unclosed inline code
-        let doc = MarkdownDocument::parse(
+        let _doc = MarkdownDocument::parse(
             PathBuf::from("test.md"),
             "text `unclosed code".to_string(),
             &highlighter,
@@ -313,7 +313,7 @@ mod tests {
         assert!(!doc.parsed_lines.is_empty());
 
         // Mixed RTL and LTR
-        let doc = MarkdownDocument::parse(
+        let _doc = MarkdownDocument::parse(
             PathBuf::from("test.md"),
             "Hello مرحبا World".to_string(),
             &highlighter,
@@ -321,7 +321,7 @@ mod tests {
         .unwrap();
 
         // Null character (should not crash)
-        let doc = MarkdownDocument::parse(
+        let _doc = MarkdownDocument::parse(
             PathBuf::from("test.md"),
             "text\x00with null".to_string(),
             &highlighter,
