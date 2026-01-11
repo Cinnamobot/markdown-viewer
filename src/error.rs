@@ -1,15 +1,22 @@
+use std::path::PathBuf;
 use thiserror::Error;
 
-#[derive(Error, Debug)]
-pub enum MdvError {
+#[derive(Debug, Error)]
+pub enum MdError {
+    #[error("File not found: {0}")]
+    FileNotFound(PathBuf),
+
     #[error("Failed to read file: {0}")]
     FileReadError(#[from] std::io::Error),
 
-    #[error("Invalid markdown syntax at line {line}: {msg}")]
-    ParseError { line: usize, msg: String },
+    #[error("Failed to parse markdown: {0}")]
+    ParseError(String),
 
-    #[error("Syntax highlighting failed: {0}")]
-    HighlightError(String),
+    #[error("Theme '{0}' not found. Available themes: {1:?}")]
+    ThemeNotFound(String, Vec<String>),
+
+    #[error("Failed to load theme: {0}")]
+    ThemeLoadError(String),
 
     #[error("File watcher error: {0}")]
     WatcherError(#[from] notify::Error),
@@ -17,5 +24,3 @@ pub enum MdvError {
     #[error("Terminal error: {0}")]
     TerminalError(String),
 }
-
-pub type Result<T> = std::result::Result<T, MdvError>;

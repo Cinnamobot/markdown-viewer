@@ -1,5 +1,6 @@
 use super::highlighter::{CodeHighlighter, StyledSpan};
 use super::toc::TocEntry;
+use crate::error::MdError;
 use pulldown_cmark::{Event, HeadingLevel, Options, Parser, Tag, TagEnd};
 use std::path::PathBuf;
 
@@ -72,7 +73,7 @@ impl MarkdownDocument {
         path: PathBuf,
         content: String,
         highlighter: &CodeHighlighter,
-    ) -> anyhow::Result<Self> {
+    ) -> Result<Self, MdError> {
         let mut parsed_lines = Vec::new();
         let mut toc = Vec::new();
 

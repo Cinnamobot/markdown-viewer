@@ -203,14 +203,13 @@ impl<'a> App<'a> {
         self.search_results.clear();
         let query_lower = self.search_query.to_lowercase();
 
-        // Search in document content
         for (line_idx, parsed_line) in self.document.parsed_lines.iter().enumerate() {
             let content = match parsed_line {
-                crate::markdown::ParsedLine::Text { content } => content.clone(),
-                crate::markdown::ParsedLine::Code { content, .. } => content.clone(),
-                crate::markdown::ParsedLine::ListItem { content, .. } => content.clone(),
-                crate::markdown::ParsedLine::BlockQuote { content } => content.clone(),
-                crate::markdown::ParsedLine::Alert { content, .. } => content.clone(),
+                crate::markdown::ParsedLine::Text { content } => content.as_str(),
+                crate::markdown::ParsedLine::Code { content, .. } => content.as_str(),
+                crate::markdown::ParsedLine::ListItem { content, .. } => content.as_str(),
+                crate::markdown::ParsedLine::BlockQuote { content } => content.as_str(),
+                crate::markdown::ParsedLine::Alert { content, .. } => content.as_str(),
                 _ => continue,
             };
 

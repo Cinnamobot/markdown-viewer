@@ -5,6 +5,7 @@ use crossterm::{
 };
 use mdv::{
     cli::Cli,
+    error::MdError,
     markdown::{CodeHighlighter, MarkdownDocument},
     tui::{self, App, ThemeManager},
     watcher::{LiveReloader, ReloadEvent},
@@ -13,45 +14,36 @@ use ratatui::{backend::CrosstermBackend, Terminal};
 use std::io;
 
 #[tokio::main]
-async fn main() -> anyhow::Result<()> {
+async fn main() -> Result<(), MdError> {
     let cli = Cli::parse();
 
-    // ファイル読み込み
     let content = std::fs::read_to_string(&cli.path)?;
 
-    // ハイライター初期化
     let highlighter = CodeHighlighter::new(cli.theme.clone());
 
-    // マークダウンパース
     let document = MarkdownDocument::parse(cli.path.clone(), content, &highlighter)?;
 
-    // テーママネージャー初期化
     let mut theme_manager = ThemeManager::new();
     theme_manager.set_theme(&cli.ui_theme);
 
-    // アプリケーション初期化
     let mut app = App::new(document, cli.show_toc, cli.line, &theme_manager);
 
-    // 見出しへのジャンプ
     if let Some(heading) = &cli.heading {
         app.jump_to_heading_by_name(heading);
     }
 
-    // ファイル監視開始
     let mut watcher = if !cli.no_watch {
         Some(LiveReloader::new(cli.path.clone())?)
     } else {
         None
     };
 
-    // ターミナル初期化
     enable_raw_mode()?;
     let mut stdout = io::stdout();
     execute!(stdout, EnterAlternateScreen)?;
     let backend = CrosstermBackend::new(stdout);
     let mut terminal = Terminal::new(backend)?;
 
-    // メインループ
     let result = run_app(
         &mut terminal,
         &mut app,
@@ -62,7 +54,6 @@ async fn main() -> anyhow::Result<()> {
     )
     .await;
 
-    // ターミナル復元
     disable_raw_mode()?;
     execute!(terminal.backend_mut(), LeaveAlternateScreen)?;
     terminal.show_cursor()?;
@@ -77,13 +68,12 @@ async fn run_app<'a>(
     highlighter: &CodeHighlighter,
     theme_manager: &'a ThemeManager,
     cli: &Cli,
-) -> anyhow::Result<()> {
+) -> Result<(), MdError> {
     let mut event_handler = tui::events::EventHandler::new();
 
     loop {
         terminal.draw(|f| tui::ui::render(f, app, theme_manager))?;
 
-        // イベント処理（真の非同期処理）
         tokio::select! {
             key_event = event_handler.next_key() => {
                 if let Some(key) = key_event? {

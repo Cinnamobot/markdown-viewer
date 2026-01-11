@@ -115,3 +115,28 @@ jobs:
 
       - name: Build
         run: cargo build --release --verbose
+
+  coverage:
+    name: Coverage
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Setup Rust
+        uses: dtolnay/rust-toolchain@stable
+
+      - name: Install tarpaulin
+        uses: actions-rs/install@v0.1
+        with:
+          crate: cargo-tarpaulin
+          version: latest
+          args: --locked
+
+      - name: Run coverage
+        run: cargo tarpaulin --out Xml --fail-under 50
+
+      - name: Upload coverage to Codecov
+        uses: codecov/codecov-action@v4
+        with:
+          files: ./target/tarpaulin/report.xml
+          fail_ci_if_error: false

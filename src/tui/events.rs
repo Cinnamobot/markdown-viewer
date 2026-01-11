@@ -1,3 +1,4 @@
+use crate::error::MdError;
 use crossterm::event::{Event, EventStream, KeyEvent};
 use futures::StreamExt;
 
@@ -18,7 +19,7 @@ impl EventHandler {
         }
     }
 
-    pub async fn next_key(&mut self) -> anyhow::Result<Option<KeyEvent>> {
+    pub async fn next_key(&mut self) -> Result<Option<KeyEvent>, MdError> {
         if let Some(event) = self.stream.next().await {
             if let Event::Key(key) = event? {
                 return Ok(Some(key));
