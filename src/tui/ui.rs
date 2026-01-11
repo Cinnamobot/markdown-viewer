@@ -172,7 +172,7 @@ pub fn render<'a>(
 
     if app.show_toc {
         // Calculate TOC width based on content (with caching)
-        let toc_width = app.get_toc_width(&theme, size.width);
+        let toc_width = app.get_toc_width(theme, size.width);
         let content_width = size.width.saturating_sub(toc_width);
 
         let chunks = Layout::default()
@@ -183,10 +183,10 @@ pub fn render<'a>(
             ])
             .split(size);
 
-        render_content(frame, chunks[0], app, &theme);
-        render_toc(frame, chunks[1], app, &theme);
+        render_content(frame, chunks[0], app, theme);
+        render_toc(frame, chunks[1], app, theme);
     } else {
-        render_content(frame, size, app, &theme);
+        render_content(frame, size, app, theme);
     }
 
     // Render status bar at the bottom
@@ -211,7 +211,7 @@ fn render_content<'a>(frame: &mut Frame, area: Rect, app: &App<'a>, theme: &UiTh
             .iter()
             .skip(app.scroll_offset)
             .take(visible_count)
-            .flat_map(|line| parsed_line_to_ratatui_lines(line, &theme, area.width as usize))
+            .flat_map(|line| parsed_line_to_ratatui_lines(line, theme, area.width as usize))
             .collect()
     };
 
@@ -1053,4 +1053,36 @@ fn parse_inline_code(text: &str, theme: &UiTheme) -> Line<'static> {
     }
 
     Line::from(spans)
+}
+
+#[cfg(test)]
+mod test_inline_code_spans {
+    use super::*;
+    use ratatui::style::{Color, Style};
+
+    #[test]
+    fn test_parse_inline_code_to_spans_basic() {
+        let text = "⟨INLINE_CODE⟩test⟨/INLINE_CODE⟩";
+        let base_style = Style::default().fg(Color::White);
+        let theme = crate::tui::UiTheme::dark();
+        let spans = parse_inline_code_to_spans(text, base_style, &theme);
+
+        assert_eq!(spans.len(), 1);
+        assert_eq!(spans[0].content, "test");
+        // Color depends on theme, so we just check it's set
+        assert!(spans[0].style.fg.is_some());
+    }
+
+    #[test]
+    fn test_parse_inline_code_to_spans_with_normal_text() {
+        let text = "normal ⟨INLINE_CODE⟩code⟨/INLINE_CODE⟩ more";
+        let base_style = Style::default().fg(Color::White);
+        let theme = crate::tui::UiTheme::dark();
+        let spans = parse_inline_code_to_spans(text, base_style, &theme);
+
+        assert_eq!(spans.len(), 3);
+        assert_eq!(spans[0].content, "normal ");
+        assert_eq!(spans[1].content, "code");
+        assert_eq!(spans[2].content, " more");
+    }
 }
