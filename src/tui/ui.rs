@@ -877,8 +877,7 @@ pub fn truncate_with_markers(text: &str, max_visible: usize) -> String {
             result.push_str(close_marker);
             i += close_marker.len();
             in_code = false;
-        } else {
-            if let Some(ch) = text[i..].chars().next() {
+        } else if let Some(ch) = text[i..].chars().next() {
                 let char_width = match ch.width() {
                     Some(w) => w,
                     None => {
