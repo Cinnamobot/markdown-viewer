@@ -31,8 +31,25 @@ pub enum ParsedLine {
     BlockQuote {
         content: String,
     },
+    Alert {
+        alert_type: AlertType,
+        content: String,
+    },
+    Image {
+        alt_text: String,
+        url: String,
+    },
     HorizontalRule,
     Empty,
+}
+
+#[derive(Debug, Clone, Copy, PartialEq)]
+pub enum AlertType {
+    Note,
+    Tip,
+    Important,
+    Warning,
+    Caution,
 }
 
 #[derive(Debug, Clone, Copy, PartialEq)]
@@ -82,6 +99,10 @@ impl MarkdownDocument {
 
         let mut in_blockquote = false;
         let mut blockquote_content = String::new();
+
+        let mut in_image = false;
+        let mut image_url = String::new();
+        let mut image_alt_text = String::new();
 
         let mut in_table = false;
         let mut in_table_head = false;
@@ -225,15 +246,43 @@ impl MarkdownDocument {
                 }
                 Event::End(TagEnd::BlockQuote(_)) => {
                     in_blockquote = false;
-                    parsed_lines.push(ParsedLine::BlockQuote {
-                        content: std::mem::take(&mut blockquote_content),
-                    });
+
+                    // GitHub Alerts パターンを検出
+                    let content = std::mem::take(&mut blockquote_content);
+                    let trimmed = content.trim();
+
+                    let alert_type = if trimmed.starts_with("[!NOTE]") {
+                        Some((AlertType::Note, &trimmed[7..]))
+                    } else if trimmed.starts_with("[!TIP]") {
+                        Some((AlertType::Tip, &trimmed[6..]))
+                    } else if trimmed.starts_with("[!IMPORTANT]") {
+                        Some((AlertType::Important, &trimmed[12..]))
+                    } else if trimmed.starts_with("[!WARNING]") {
+                        Some((AlertType::Warning, &trimmed[10..]))
+                    } else if trimmed.starts_with("[!CAUTION]") {
+                        Some((AlertType::Caution, &trimmed[10..]))
+                    } else {
+                        None
+                    };
+
+                    if let Some((alert_type, alert_content)) = alert_type {
+                        parsed_lines.push(ParsedLine::Alert {
+                            alert_type,
+                            content: alert_content.trim().to_string(),
+                        });
+                    } else {
+                        parsed_lines.push(ParsedLine::BlockQuote {
+                            content,
+                        });
+                    }
                 }
                 Event::Text(text) => {
                     if in_heading {
                         heading_text.push_str(&text);
                     } else if in_code_block {
                         code_content.push_str(&text);
+                    } else if in_image {
+                        image_alt_text.push_str(&text);
                     } else if in_table {
                         current_cell.push_str(&text);
                     } else if in_list {
@@ -289,6 +338,25 @@ impl MarkdownDocument {
                         });
                     }
                     parsed_lines.push(ParsedLine::HorizontalRule);
+                }
+                Event::Start(Tag::Image { dest_url, .. }) => {
+                    if !current_text.is_empty() {
+                        parsed_lines.push(ParsedLine::Text {
+                            content: std::mem::take(&mut current_text),
+                        });
+                    }
+                    // 画像のURL（パス）を記録
+                    // alt_textは後のEvent::Textで取得
+                    in_image = true;
+                    image_url = dest_url.to_string();
+                    image_alt_text.clear();
+                }
+                Event::End(TagEnd::Image) => {
+                    in_image = false;
+                    parsed_lines.push(ParsedLine::Image {
+                        alt_text: std::mem::take(&mut image_alt_text),
+                        url: std::mem::take(&mut image_url),
+                    });
                 }
                 Event::Start(Tag::Table(alignments)) => {
                     if !current_text.is_empty() {

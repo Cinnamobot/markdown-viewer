@@ -1,11 +1,23 @@
-use crossterm::event::{self, Event, KeyEvent};
-use std::time::Duration;
+use crossterm::event::{Event, EventStream, KeyEvent};
+use futures::StreamExt;
 
-pub fn poll_event(timeout: Duration) -> anyhow::Result<Option<KeyEvent>> {
-    if event::poll(timeout)? {
-        if let Event::Key(key) = event::read()? {
-            return Ok(Some(key));
+pub struct EventHandler {
+    stream: EventStream,
+}
+
+impl EventHandler {
+    pub fn new() -> Self {
+        Self {
+            stream: EventStream::new(),
         }
     }
-    Ok(None)
+
+    pub async fn next_key(&mut self) -> anyhow::Result<Option<KeyEvent>> {
+        if let Some(event) = self.stream.next().await {
+            if let Event::Key(key) = event? {
+                return Ok(Some(key));
+            }
+        }
+        Ok(None)
+    }
 }

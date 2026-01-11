@@ -147,8 +147,8 @@ mdv examples/sample.md
 
 ### 🎨 利用可能なテーマ
 
+- `base16-eighties.dark` - レトロで色彩豊かなダーク（デフォルト）
 - `base16-ocean.dark` - ダークブルー系
-- `base16-eighties.dark` - レトロなダーク
 - `base16-mocha.dark` - 温かみのあるダーク
 - `InspiredGitHub` - GitHub風
 - `Solarized (dark)` - 目に優しいダーク

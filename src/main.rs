@@ -11,7 +11,6 @@ use mdv::{
 };
 use ratatui::{backend::CrosstermBackend, Terminal};
 use std::io;
-use std::time::Duration;
 
 #[tokio::main]
 async fn main() -> anyhow::Result<()> {
@@ -66,14 +65,14 @@ async fn run_app(
     highlighter: &CodeHighlighter,
     cli: &Cli,
 ) -> anyhow::Result<()> {
+    let mut event_handler = tui::events::EventHandler::new();
+
     loop {
         terminal.draw(|f| tui::ui::render(f, app))?;
 
-        // イベント処理（タイムアウト付き）
+        // イベント処理（真の非同期処理）
         tokio::select! {
-            key_event = async {
-                tui::events::poll_event(Duration::from_millis(100))
-            } => {
+            key_event = event_handler.next_key() => {
                 if let Some(key) = key_event? {
                     app.handle_key(key.code, key.modifiers);
                     if app.should_quit {
@@ -90,18 +89,28 @@ async fn run_app(
                 if let Some(event) = reload_event {
                     match event {
                         ReloadEvent::FileChanged(_) => {
-                            if let Ok(content) = std::fs::read_to_string(&cli.path) {
-                                if let Ok(new_document) = MarkdownDocument::parse(
-                                    cli.path.clone(),
-                                    content,
-                                    highlighter,
-                                ) {
-                                    app.update_document(new_document);
+                            match std::fs::read_to_string(&cli.path) {
+                                Ok(content) => {
+                                    match MarkdownDocument::parse(
+                                        cli.path.clone(),
+                                        content,
+                                        highlighter,
+                                    ) {
+                                        Ok(new_document) => {
+                                            app.update_document(new_document);
+                                        }
+                                        Err(e) => {
+                                            eprintln!("Failed to parse markdown: {}", e);
+                                        }
+                                    }
+                                }
+                                Err(e) => {
+                                    eprintln!("Failed to read file: {}", e);
                                 }
                             }
                         }
-                        ReloadEvent::Error(_) => {
-                            // エラーは無視（ファイルが一時的に削除されることがある）
+                        ReloadEvent::Error(err) => {
+                            eprintln!("File watcher error: {}", err);
                         }
                     }
                 }

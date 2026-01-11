@@ -17,8 +17,8 @@ pub struct Cli {
     #[arg(short = 'n', long)]
     pub no_watch: bool,
 
-    /// Syntax highlighting theme (default: base16-ocean.dark)
-    #[arg(short = 't', long, default_value = "base16-ocean.dark")]
+    /// Syntax highlighting theme (default: base16-eighties.dark)
+    #[arg(short = 't', long, default_value = "base16-eighties.dark")]
     pub theme: String,
 
     /// Start with table of contents open

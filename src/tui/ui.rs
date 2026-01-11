@@ -294,19 +294,58 @@ fn parsed_line_to_ratatui_lines(line: &ParsedLine) -> Vec<Line<'static>> {
                 .split('\n')
                 .map(|line| {
                     let mut spans = vec![Span::styled("▐ ", border_style)];
-                    
+
                     // Check for inline code markers
                     if line.contains("⟨INLINE_CODE⟩") {
                         spans.extend(parse_inline_code_to_spans(line, text_style));
                     } else {
                         spans.push(Span::styled(line.to_string(), text_style));
                     }
-                    
+
                     Line::from(spans)
                 })
                 .collect();
             let mut result = vec![Line::from("")];
             result.extend(lines);
+            result.push(Line::from(""));
+            result
+        }
+        ParsedLine::Alert { alert_type, content } => {
+            use crate::markdown::parser::AlertType;
+
+            let (icon, label, border_color, text_color) = match alert_type {
+                AlertType::Note => ("ℹ", "NOTE", Color::Blue, Color::LightBlue),
+                AlertType::Tip => ("💡", "TIP", Color::Green, Color::LightGreen),
+                AlertType::Important => ("❗", "IMPORTANT", Color::Magenta, Color::LightMagenta),
+                AlertType::Warning => ("⚠", "WARNING", Color::Yellow, Color::LightYellow),
+                AlertType::Caution => ("🛑", "CAUTION", Color::Red, Color::LightRed),
+            };
+
+            let border_style = Style::default().fg(border_color).add_modifier(Modifier::BOLD);
+            let text_style = Style::default().fg(text_color);
+
+            let mut result = vec![
+                Line::from(""),
+                Line::from(vec![
+                    Span::styled("┏━━ ", border_style),
+                    Span::styled(format!("{} {} ", icon, label), border_style),
+                    Span::styled("━".repeat(60), border_style),
+                ]),
+            ];
+
+            for line in content.split('\n') {
+                let mut spans = vec![Span::styled("┃ ", border_style)];
+
+                if line.contains("⟨INLINE_CODE⟩") {
+                    spans.extend(parse_inline_code_to_spans(line, text_style));
+                } else {
+                    spans.push(Span::styled(line.to_string(), text_style));
+                }
+
+                result.push(Line::from(spans));
+            }
+
+            result.push(Line::from(Span::styled("┗━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━", border_style)));
             result.push(Line::from(""));
             result
         }
@@ -321,6 +360,19 @@ fn parsed_line_to_ratatui_lines(line: &ParsedLine) -> Vec<Line<'static>> {
                 "━".repeat(80),
                 Style::default().fg(Color::Cyan),
             )),
+            Line::from(""),
+        ],
+        ParsedLine::Image { alt_text, url } => vec![
+            Line::from(""),
+            Line::from(vec![
+                Span::styled("[Image: ".to_string(), Style::default().fg(Color::Yellow)),
+                Span::styled(url.to_string(), Style::default().fg(Color::Cyan).add_modifier(Modifier::UNDERLINED)),
+                Span::styled("]".to_string(), Style::default().fg(Color::Yellow)),
+            ]),
+            Line::from(vec![
+                Span::styled("Alt: ".to_string(), Style::default().fg(Color::DarkGray)),
+                Span::styled(alt_text.to_string(), Style::default().fg(Color::Gray)),
+            ]),
             Line::from(""),
         ],
         ParsedLine::Empty => vec![Line::from("")],
@@ -549,12 +601,22 @@ pub fn truncate_with_markers(text: &str, max_visible: usize) -> String {
             // Check character width
             let ch = chars[i];
             // Use width() instead of width_cjk()
-            let char_width = ch.width().unwrap_or(1);
-            
+            let char_width = match ch.width() {
+                Some(w) => w,
+                None => {
+                    // 制御文字は表示しない
+                    if ch.is_control() {
+                        0
+                    } else {
+                        1
+                    }
+                }
+            };
+
             if current_visible_width + char_width > max_visible {
                 break;
             }
-            
+
             result.push(ch);
             current_visible_width += char_width;
             i += 1;
