@@ -21,6 +21,10 @@ pub struct Cli {
     #[arg(short = 't', long, default_value = "base16-eighties.dark")]
     pub theme: String,
 
+    /// UI theme (default: dark)
+    #[arg(long, default_value = "dark")]
+    pub ui_theme: String,
+
     /// Start with table of contents open
     #[arg(long)]
     pub show_toc: bool,

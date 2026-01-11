@@ -6,7 +6,7 @@ use crossterm::{
 use mdv::{
     cli::Cli,
     markdown::{CodeHighlighter, MarkdownDocument},
-    tui::{self, App},
+    tui::{self, App, ThemeManager},
     watcher::{LiveReloader, ReloadEvent},
 };
 use ratatui::{backend::CrosstermBackend, Terminal};
@@ -25,8 +25,12 @@ async fn main() -> anyhow::Result<()> {
     // マークダウンパース
     let document = MarkdownDocument::parse(cli.path.clone(), content, &highlighter)?;
 
+    // テーママネージャー初期化
+    let mut theme_manager = ThemeManager::new();
+    theme_manager.set_theme(&cli.ui_theme);
+
     // アプリケーション初期化
-    let mut app = App::new(document, cli.show_toc, cli.line);
+    let mut app = App::new(document, cli.show_toc, cli.line, &theme_manager);
 
     // 見出しへのジャンプ
     if let Some(heading) = &cli.heading {
@@ -48,7 +52,15 @@ async fn main() -> anyhow::Result<()> {
     let mut terminal = Terminal::new(backend)?;
 
     // メインループ
-    let result = run_app(&mut terminal, &mut app, &mut watcher, &highlighter, &cli).await;
+    let result = run_app(
+        &mut terminal,
+        &mut app,
+        &mut watcher,
+        &highlighter,
+        &theme_manager,
+        &cli,
+    )
+    .await;
 
     // ターミナル復元
     disable_raw_mode()?;
@@ -58,17 +70,18 @@ async fn main() -> anyhow::Result<()> {
     result
 }
 
-async fn run_app(
+async fn run_app<'a>(
     terminal: &mut Terminal<CrosstermBackend<io::Stdout>>,
-    app: &mut App,
+    app: &mut App<'a>,
     watcher: &mut Option<LiveReloader>,
     highlighter: &CodeHighlighter,
+    theme_manager: &'a ThemeManager,
     cli: &Cli,
 ) -> anyhow::Result<()> {
     let mut event_handler = tui::events::EventHandler::new();
 
     loop {
-        terminal.draw(|f| tui::ui::render(f, app))?;
+        terminal.draw(|f| tui::ui::render(f, app, theme_manager))?;
 
         // イベント処理（真の非同期処理）
         tokio::select! {
