@@ -1,4 +1,5 @@
 use crate::markdown::MarkdownDocument;
+use crate::tui::ui::calculate_toc_width;
 use crate::tui::ThemeManager;
 use crossterm::event::{KeyCode, KeyModifiers};
 
@@ -15,6 +16,7 @@ pub struct App<'a> {
     pub search_query: String,
     pub search_results: Vec<usize>,
     pub current_search_index: usize,
+    pub toc_width_cache: Option<u16>,
 }
 
 impl<'a> App<'a> {
@@ -38,11 +40,13 @@ impl<'a> App<'a> {
             search_query: String::new(),
             search_results: Vec::new(),
             current_search_index: 0,
+            toc_width_cache: None,
         }
     }
 
     pub fn update_document(&mut self, document: MarkdownDocument) {
         self.document = document;
+        self.invalidate_toc_cache();
 
         // Adjust scroll_offset if it exceeds the new document length
         if self.scroll_offset >= self.document.parsed_lines.len() {
@@ -158,6 +162,22 @@ impl<'a> App<'a> {
             self.toc_selected = idx;
             self.jump_to_heading();
         }
+    }
+
+    /// Get cached TOC width or calculate if not cached
+    pub fn get_toc_width(&mut self, theme: &crate::tui::UiTheme, terminal_width: u16) -> u16 {
+        if let Some(cached_width) = self.toc_width_cache {
+            cached_width
+        } else {
+            let width = calculate_toc_width(self, theme, terminal_width);
+            self.toc_width_cache = Some(width);
+            width
+        }
+    }
+
+    /// Clear TOC width cache when document changes
+    pub fn invalidate_toc_cache(&mut self) {
+        self.toc_width_cache = None;
     }
 
     pub fn start_search(&mut self) {

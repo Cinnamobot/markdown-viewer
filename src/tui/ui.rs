@@ -9,9 +9,10 @@ use ratatui::{
     Frame,
 };
 use syntect::highlighting::Color as SyntectColor;
+use unicode_width::UnicodeWidthChar;
 
 /// Calculate optimal TOC width based on content and terminal size
-fn calculate_toc_width<'a>(app: &App<'a>, theme: &UiTheme, terminal_width: u16) -> u16 {
+pub fn calculate_toc_width<'a>(app: &App<'a>, theme: &UiTheme, terminal_width: u16) -> u16 {
     if app.document.toc.is_empty() {
         return 20; // Minimum width for empty TOC
     }
@@ -41,11 +42,16 @@ fn calculate_toc_width<'a>(app: &App<'a>, theme: &UiTheme, terminal_width: u16) 
     (content_len as u16).clamp(min_toc_width, max_toc_width as u16)
 }
 
-/// Simple word wrapping function
+/// Improved word wrapping function with Unicode support
 fn wrap_text(text: &str, max_width: usize) -> Vec<String> {
+    if text.is_empty() {
+        return vec![String::new()];
+    }
+
     let mut result = Vec::new();
     let mut current_line = String::new();
 
+    // Split by whitespace, but preserve spaces within words
     for word in text.split_whitespace() {
         let word_len = visible_text_len(word);
         let current_len = visible_text_len(&current_line);
@@ -57,13 +63,40 @@ fn wrap_text(text: &str, max_width: usize) -> Vec<String> {
             }
             current_line.push_str(word);
         } else {
-            // Word doesn't fit, start new line
+            // Word doesn't fit
             if !current_line.is_empty() {
                 result.push(current_line);
-                current_line = word.to_string();
+                current_line = String::new();
+            }
+
+            // Handle very long words by breaking them
+            if word_len > max_width {
+                let mut remaining = word;
+                while !remaining.is_empty() {
+                    let mut chunk_len = 0;
+                    let mut chunk = String::new();
+
+                    for ch in remaining.chars() {
+                        let ch_width = ch.width().unwrap_or(1) as usize;
+                        if chunk_len + ch_width > max_width {
+                            break;
+                        }
+                        chunk.push(ch);
+                        chunk_len += ch_width;
+                    }
+
+                    if chunk.is_empty() {
+                        // Single character is too wide, add anyway
+                        chunk.push(remaining.chars().next().unwrap());
+                        remaining = &remaining[chunk.len()..];
+                    } else {
+                        remaining = &remaining[chunk.len()..];
+                    }
+
+                    result.push(chunk);
+                }
             } else {
-                // Very long word, might need to break it
-                result.push(word.to_string());
+                current_line = word.to_string();
             }
         }
     }
@@ -138,8 +171,8 @@ pub fn render<'a>(
     let theme = &theme_manager.current_theme();
 
     if app.show_toc {
-        // Calculate TOC width based on content
-        let toc_width = calculate_toc_width(app, &theme, size.width);
+        // Calculate TOC width based on content (with caching)
+        let toc_width = app.get_toc_width(&theme, size.width);
         let content_width = size.width.saturating_sub(toc_width);
 
         let chunks = Layout::default()
@@ -507,12 +540,28 @@ fn parsed_line_to_ratatui_lines(
                 .add_modifier(Modifier::BOLD);
             let text_style = Style::default().fg(text_color);
 
+            // Calculate dynamic width based on content
+            let header_prefix_len = visible_text_len(&format!("┏━━ {icon} {label} "));
+            let footer_prefix_len = visible_text_len("┗");
+            let side_border_len = visible_text_len("┃ ");
+
+            let mut max_content_len = 0;
+            for line in content.split('\n') {
+                let line_len = visible_text_len(line);
+                max_content_len = max_content_len.max(line_len);
+            }
+
+            let total_width = (header_prefix_len + max_content_len + side_border_len)
+                .max(footer_prefix_len + 60)
+                .min(area_width.saturating_sub(4));
+            let border_fill_len = total_width.saturating_sub(header_prefix_len);
+
             let mut result = vec![
                 Line::from(""),
                 Line::from(vec![
                     Span::styled("┏━━ ", border_style),
                     Span::styled(format!("{icon} {label} "), border_style),
-                    Span::styled("━".repeat(60), border_style),
+                    Span::styled("━".repeat(border_fill_len), border_style),
                 ]),
             ];
 
@@ -525,13 +574,26 @@ fn parsed_line_to_ratatui_lines(
                     spans.push(Span::styled(line.to_string(), text_style));
                 }
 
+                // Pad to align with border
+                let current_len = visible_text_len(
+                    &line
+                        .replace("⟨INLINE_CODE⟩", "")
+                        .replace("⟨/INLINE_CODE⟩", ""),
+                );
+                let padding_needed = max_content_len.saturating_sub(current_len);
+                if padding_needed > 0 {
+                    spans.push(Span::raw(" ".repeat(padding_needed)));
+                }
+
+                spans.push(Span::styled(" ", border_style)); // Right padding
                 result.push(Line::from(spans));
             }
 
-            result.push(Line::from(Span::styled(
-                "┗━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━",
-                border_style,
-            )));
+            let footer_line = format!(
+                "┗{}",
+                "━".repeat(total_width.saturating_sub(footer_prefix_len))
+            );
+            result.push(Line::from(Span::styled(footer_line, border_style)));
             result.push(Line::from(""));
             result
         }
@@ -769,23 +831,27 @@ pub fn visible_text_len(text: &str) -> usize {
 
 fn align_text(text: &str, width: usize, alignment: Alignment) -> String {
     let text_len = visible_text_len(text);
-    if text_len >= width {
+    let content = if text_len > width {
         // 長すぎる場合は切り詰める - マーカーを保持しながら可視文字数で切り詰め
         truncate_with_markers(text, width)
     } else {
-        let padding = width - text_len;
-        match alignment {
-            Alignment::Left | Alignment::None => {
-                format!("{text}{}", " ".repeat(padding))
-            }
-            Alignment::Right => {
-                format!("{}{text}", " ".repeat(padding))
-            }
-            Alignment::Center => {
-                let left_pad = padding / 2;
-                let right_pad = padding - left_pad;
-                format!("{}{text}{}", " ".repeat(left_pad), " ".repeat(right_pad))
-            }
+        text.to_string()
+    };
+
+    let content_len = visible_text_len(&content);
+    let padding = width.saturating_sub(content_len);
+
+    match alignment {
+        Alignment::Left | Alignment::None => {
+            format!("{content}{}", " ".repeat(padding))
+        }
+        Alignment::Right => {
+            format!("{}{content}", " ".repeat(padding))
+        }
+        Alignment::Center => {
+            let left_pad = padding / 2;
+            let right_pad = padding - left_pad;
+            format!("{}{content}{}", " ".repeat(left_pad), " ".repeat(right_pad))
         }
     }
 }
