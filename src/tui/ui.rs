@@ -30,7 +30,7 @@ pub fn calculate_toc_width<'a>(app: &App<'a>, theme: &UiTheme, terminal_width: u
         .unwrap_or(20);
 
     // TOC title length
-    let title_len = " Table of Contents ".len() as usize + 4; // borders
+    let title_len = " Table of Contents ".len() + 4; // borders
 
     let content_len = max_heading_len.max(title_len);
 
@@ -56,7 +56,7 @@ fn wrap_text(text: &str, max_width: usize) -> Vec<String> {
         let word_len = visible_text_len(word);
         let current_len = visible_text_len(&current_line);
 
-        if current_len + word_len + 1 <= max_width || current_line.is_empty() {
+        if current_len + word_len < max_width || current_line.is_empty() {
             // Word fits on current line
             if !current_line.is_empty() {
                 current_line.push(' ');
@@ -77,7 +77,7 @@ fn wrap_text(text: &str, max_width: usize) -> Vec<String> {
                     let mut chunk = String::new();
 
                     for ch in remaining.chars() {
-                        let ch_width = ch.width().unwrap_or(1) as usize;
+                        let ch_width = ch.width().unwrap_or(1);
                         if chunk_len + ch_width > max_width {
                             break;
                         }
