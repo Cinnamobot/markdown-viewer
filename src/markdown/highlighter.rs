@@ -25,7 +25,7 @@ impl CodeHighlighter {
         THEME_SET
             .themes
             .get(&self.theme_name)
-            .or_else(|| THEME_SET.themes.get("base16-ocean.dark"))
+            .or_else(|| THEME_SET.themes.get("base16-eighties.dark"))
             .or_else(|| THEME_SET.themes.values().next())
             .unwrap() // Safe: ThemeSet.load_defaults() always returns a non-empty theme set
     }
@@ -40,15 +40,20 @@ impl CodeHighlighter {
 
         code.lines()
             .map(|line| {
-                highlighter
-                    .highlight_line(line, &SYNTAX_SET)
-                    .unwrap_or_default()
-                    .into_iter()
-                    .map(|(style, text)| StyledSpan {
-                        style,
-                        text: text.to_string(),
-                    })
-                    .collect()
+                match highlighter.highlight_line(line, &SYNTAX_SET) {
+                    Ok(spans) => spans
+                        .into_iter()
+                        .map(|(style, text)| StyledSpan {
+                            style,
+                            text: text.to_string(),
+                        })
+                        .collect(),
+                    Err(_e) => {
+                        #[cfg(debug_assertions)]
+                        eprintln!("Syntax highlight error: {}", _e);
+                        vec![]
+                    }
+                }
             })
             .collect()
     }
