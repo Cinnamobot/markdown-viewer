@@ -5,6 +5,12 @@ pub struct EventHandler {
     stream: EventStream,
 }
 
+impl Default for EventHandler {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
 impl EventHandler {
     pub fn new() -> Self {
         Self {

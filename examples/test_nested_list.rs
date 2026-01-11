@@ -13,7 +13,7 @@ fn main() {
 
     println!("Parsed list items around line 94-100:");
     println!("=====================================\n");
-    
+
     let mut found_nested_list = false;
     for line in &doc.parsed_lines {
         if let ParsedLine::ListItem {
@@ -22,12 +22,20 @@ fn main() {
             checked,
         } = line
         {
-            if content.contains("Parent") || content.contains("Child") || content.contains("Another parent") || content.contains("Grandchild") {
+            if content.contains("Parent")
+                || content.contains("Child")
+                || content.contains("Another parent")
+                || content.contains("Grandchild")
+            {
                 found_nested_list = true;
                 let indent_str = "  ".repeat(*indent);
                 let marker = if checked.is_some() { "[ ]" } else { "●" };
-                println!("{}{} {}", indent_str, marker, content);
-            } else if found_nested_list && !content.contains("Parent") && !content.contains("Child") && !content.contains("Grandchild") {
+                println!("{indent_str}{marker} {content}");
+            } else if found_nested_list
+                && !content.contains("Parent")
+                && !content.contains("Child")
+                && !content.contains("Grandchild")
+            {
                 // Stop after we've passed the nested list section
                 if content.contains("Completed") {
                     break;

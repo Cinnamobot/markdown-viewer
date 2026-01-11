@@ -183,12 +183,11 @@ impl MarkdownDocument {
                             content: std::mem::take(&mut current_text),
                         });
                     }
-                    
+
                     // ネストされたリストが開始する前に、親アイテムの内容を出力
                     if in_list && !list_item_stack.is_empty() {
                         if let Some(item) = list_item_stack.last_mut() {
                             if !item.0.trim().is_empty() {
-
                                 parsed_lines.push(ParsedLine::ListItem {
                                     indent: item.2,
                                     content: item.0.trim().to_string(),
@@ -199,7 +198,7 @@ impl MarkdownDocument {
                             }
                         }
                     }
-                    
+
                     in_list = true;
                     list_depth += 1;
                 }
@@ -219,7 +218,6 @@ impl MarkdownDocument {
                         if let Some((content, checked, indent)) = list_item_stack.pop() {
                             // 内容が空でない場合のみ出力（既に出力済みの場合は空）
                             if !content.trim().is_empty() {
-
                                 parsed_lines.push(ParsedLine::ListItem {
                                     indent,
                                     content: content.trim().to_string(),
@@ -251,16 +249,17 @@ impl MarkdownDocument {
                     let content = std::mem::take(&mut blockquote_content);
                     let trimmed = content.trim();
 
-                    let alert_type = if trimmed.starts_with("[!NOTE]") {
-                        Some((AlertType::Note, &trimmed[7..]))
-                    } else if trimmed.starts_with("[!TIP]") {
-                        Some((AlertType::Tip, &trimmed[6..]))
-                    } else if trimmed.starts_with("[!IMPORTANT]") {
-                        Some((AlertType::Important, &trimmed[12..]))
-                    } else if trimmed.starts_with("[!WARNING]") {
-                        Some((AlertType::Warning, &trimmed[10..]))
-                    } else if trimmed.starts_with("[!CAUTION]") {
-                        Some((AlertType::Caution, &trimmed[10..]))
+                    #[allow(clippy::manual_map)]
+                    let alert_type = if let Some(stripped) = trimmed.strip_prefix("[!NOTE]") {
+                        Some((AlertType::Note, stripped))
+                    } else if let Some(stripped) = trimmed.strip_prefix("[!TIP]") {
+                        Some((AlertType::Tip, stripped))
+                    } else if let Some(stripped) = trimmed.strip_prefix("[!IMPORTANT]") {
+                        Some((AlertType::Important, stripped))
+                    } else if let Some(stripped) = trimmed.strip_prefix("[!WARNING]") {
+                        Some((AlertType::Warning, stripped))
+                    } else if let Some(stripped) = trimmed.strip_prefix("[!CAUTION]") {
+                        Some((AlertType::Caution, stripped))
                     } else {
                         None
                     };
@@ -271,9 +270,7 @@ impl MarkdownDocument {
                             content: alert_content.trim().to_string(),
                         });
                     } else {
-                        parsed_lines.push(ParsedLine::BlockQuote {
-                            content,
-                        });
+                        parsed_lines.push(ParsedLine::BlockQuote { content });
                     }
                 }
                 Event::Text(text) => {
@@ -297,7 +294,7 @@ impl MarkdownDocument {
                     }
                 }
                 Event::Code(code) => {
-                    let code_str = format!("⟨INLINE_CODE⟩{}⟨/INLINE_CODE⟩", code);
+                    let code_str = format!("⟨INLINE_CODE⟩{code}⟨/INLINE_CODE⟩");
                     if in_heading {
                         heading_text.push_str(&code_str);
                     } else if in_table {
