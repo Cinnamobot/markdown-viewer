@@ -87,8 +87,12 @@ jobs:
         run: cargo fmt --all -- --check
 
   build:
-    name: Build
-    runs-on: ubuntu-latest
+    name: Build (${{ matrix.os }})
+    runs-on: ${{ matrix.os }}
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [ubuntu-latest, windows-latest, macos-latest]
     steps:
       - uses: actions/checkout@v4
 
@@ -133,7 +137,7 @@ jobs:
           args: --locked
 
       - name: Run coverage
-        run: cargo tarpaulin --out Xml --fail-under 20
+        run: cargo tarpaulin --out Xml --fail-under 25
 
       - name: Upload coverage to Codecov
         uses: codecov/codecov-action@v4

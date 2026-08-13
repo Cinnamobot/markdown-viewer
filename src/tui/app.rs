@@ -1,4 +1,5 @@
-use crate::markdown::MarkdownDocument;
+use crate::error::MdError;
+use crate::markdown::{self, MarkdownDocument};
 use crate::tui::ui::calculate_toc_width;
 use crate::tui::ThemeManager;
 use crossterm::event::{KeyCode, KeyModifiers};
@@ -17,6 +18,9 @@ pub struct App<'a> {
     pub search_results: Vec<usize>,
     pub current_search_index: usize,
     pub toc_width_cache: Option<u16>,
+    pub updated_content: Option<String>,
+    pub status_message: Option<String>,
+    pub show_help: bool,
 }
 
 impl<'a> App<'a> {
@@ -41,6 +45,9 @@ impl<'a> App<'a> {
             search_results: Vec::new(),
             current_search_index: 0,
             toc_width_cache: None,
+            updated_content: None,
+            status_message: None,
+            show_help: false,
         }
     }
 
@@ -60,6 +67,17 @@ impl<'a> App<'a> {
     }
 
     pub fn handle_key(&mut self, key: KeyCode, modifiers: KeyModifiers) {
+        // ヘルプ表示中は ? と Esc と q のみ受け付ける
+        if self.show_help {
+            match (key, modifiers) {
+                (KeyCode::Char('?'), _) | (KeyCode::Esc, _) | (KeyCode::Char('q'), _) => {
+                    self.show_help = false;
+                }
+                _ => {}
+            }
+            return;
+        }
+
         // Handle search mode input
         if self.search_mode && matches!(key, KeyCode::Char(_)) && modifiers.is_empty() {
             if let KeyCode::Char(c) = key {
@@ -67,6 +85,8 @@ impl<'a> App<'a> {
             }
             return;
         }
+
+        self.status_message = None;
 
         match (key, modifiers) {
             (KeyCode::Char('q'), _) | (KeyCode::Char('c'), KeyModifiers::CONTROL) => {
@@ -86,6 +106,10 @@ impl<'a> App<'a> {
                     self.scroll_up();
                 }
             }
+            (KeyCode::Char(' '), _) if !self.show_toc => {
+                let _ = self.toggle_current_checkbox();
+            }
+            (KeyCode::Char('?'), _) => self.show_help = true,
             (KeyCode::Char('t'), _) => self.toggle_toc(),
             (KeyCode::Enter, _) if self.show_toc => self.jump_to_heading(),
             (KeyCode::Enter, _) if self.search_mode => self.perform_search(),
@@ -162,6 +186,42 @@ impl<'a> App<'a> {
             self.toc_selected = idx;
             self.jump_to_heading();
         }
+    }
+
+    /// カーソル位置のチェックボックスをトグルしてファイルへ書き戻す
+    ///
+    /// 成功時は `updated_content` に新しいコンテンツが入り、呼び出し側が
+    /// 再パースして `update_document` する。
+    pub fn toggle_current_checkbox(&mut self) -> Result<(), MdError> {
+        let line_num = match self.document.parsed_lines.get(self.scroll_offset) {
+            Some(markdown::ParsedLine::ListItem {
+                line_num: Some(n), ..
+            }) => *n,
+            _ => return Ok(()),
+        };
+
+        let new_content =
+            match markdown::parser::toggle_checkbox_in_content(&self.document.content, line_num) {
+                Some(content) => content,
+                None => return Ok(()),
+            };
+
+        match std::fs::write(&self.document.path, &new_content) {
+            Ok(()) => {
+                self.status_message = Some("Checkbox toggled".to_string());
+                self.updated_content = Some(new_content);
+                Ok(())
+            }
+            Err(e) => {
+                self.status_message = Some(format!("Write failed: {e}"));
+                Err(e.into())
+            }
+        }
+    }
+
+    /// トグル後の新しいコンテンツを取り出す
+    pub fn take_updated_content(&mut self) -> Option<String> {
+        self.updated_content.take()
     }
 
     /// Get cached TOC width or calculate if not cached

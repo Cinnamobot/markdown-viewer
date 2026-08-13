@@ -4,6 +4,27 @@
 
 ## [Unreleased]
 
+### ✨ 機能追加
+
+- **チェックボックス連動** (`Space`キー)
+  - カーソル位置のタスクリストを `[ ]` ⇔ `[x]` にトグル
+  - 元のファイルに書き戻し、即座に再描画
+  - ネストされたタスクリストにも対応
+- **カスタムテーマ設定** (`--config <file>` / デフォルト設定パス)
+  - `~/.config/mdv/theme.toml`（Linux/macOS）、`%APPDATA%\mdv\theme.toml`（Windows）に配置すると自動読み込み
+  - 色名に加えて16進数形式（`#RRGGBB` / `#RGB`）に対応
+- **ヘルプ画面** (`?`キー)
+  - 全キーバインドの一覧を中央オーバーレイで表示
+
+### 🔧 改善
+
+- `Cargo.lock` をリポジトリに含め、再現可能なビルドを保証
+- CI: ビルドジョブを Windows / macOS / Linux の matrix に拡張
+- CI: カバレッジ閾値を20%→25%に引き上げ
+- リポジトリ内の破損したエンコーディング（CHANGELOG.md / USAGE.md）を修正
+- コミット済みの不要ファイル（tarpaulinレポート、Zone.Identifier）を削除
+- `notify-debouncer-full` 0.4のAPI変更（`NoCache`→`FileIdMap`）に対応
+
 ## [0.2.0] - 2026-01-11
 
 ### ✨ 機能追加
@@ -37,7 +58,7 @@
   - フォールバック処理を追加し、利用可能な任意のテーマを使用するように改善
 - **[CRITICAL]** ライブリロード時にTOC（目次）の選択インデックスが範囲外になりパニックする問題を修正 ([#9](https://github.com/Cinnamobot/markdown-viewer/issues/9), [#11](https://github.com/Cinnamobot/markdown-viewer/pull/11))
   - ファイル変更で見出しが減少した場合に自動的に調整されるように修正
-- ライブリロードのチャネルバッファサイズを10→100に増加し、高頻度のファイル変更に対応 ([#7](https://github.com/Cinnamobot/markdown-viewer/issues/7), [#12](https://github.com/Cinnamobot/markdown-viewer/pull/12))
+- ライブリロードのチャネルバッファサイズを増加し、高頻度のファイル変更に対応 ([#7](https://github.com/Cinnamobot/markdown-viewer/issues/7), [#12](https://github.com/Cinnamobot/markdown-viewer/pull/12))
 - 空のドキュメントや空のTOCで適切なメッセージを表示するように改善 ([#7](https://github.com/Cinnamobot/markdown-viewer/issues/7), [#13](https://github.com/Cinnamobot/markdown-viewer/pull/13))
 - 不正なMarkdownで生成される空のテーブルに対する境界値チェックを追加 ([#7](https://github.com/Cinnamobot/markdown-viewer/issues/7), [#14](https://github.com/Cinnamobot/markdown-viewer/pull/14))
 
@@ -58,7 +79,7 @@
 
 ### ✨ 機能追加
 
-- ⚡ **超高速起動**: 遅延読み込みと最適化により、50ms以下で起動します。
+- ⚡ **超高速起動**: 遅延読み込みと最適化により、30ms以下で起動します。
 - 🔄 **ライブリロード**: ファイルの変更を自動検知し、即座にビューを更新します。
 - 🎨 **シンタックスハイライト**: `syntect`を使用した美しいコードブロック表示を実現しました。
 - 📑 **目次ナビゲーション**: `t`キーで目次を表示し、各見出しへ素早くジャンプできます。

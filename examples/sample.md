@@ -54,7 +54,27 @@ mdv -H "Installation" README.md
 | `PageDown/PageUp` | Page scroll |
 | `t` | Toggle table of contents |
 | `Enter` | Jump to selected heading (in TOC) |
+| `Space` | Toggle checkbox (writes back to file) |
+| `/` | Search (`n` / `N` for next/prev) |
+| `?` | Show help |
 | `q` / `Ctrl+C` | Quit |
+
+## GitHub Alerts
+
+> [!NOTE]
+> Useful information that users should know.
+
+> [!TIP]
+> A helpful tip for a better experience.
+
+> [!IMPORTANT]
+> Key information users need to know.
+
+> [!WARNING]
+> Urgent info that needs immediate user attention.
+
+> [!CAUTION]
+> Advises about certain risks.
 
 ## Code Example
 
@@ -84,6 +104,24 @@ for i in range(10):
     print(f"fib({i}) = {fibonacci(i)}")
 ```
 
+And a JavaScript example:
+
+```javascript
+const greet = (name) => {
+  const message = `Hello, ${name}!`;
+  console.log(message);
+  return message;
+};
+
+// Async example
+async function fetchData(url) {
+  const res = await fetch(url);
+  return res.json();
+}
+```
+
+Inline code like `let x = 42;` or `cargo build --release` is rendered with a distinctive style.
+
 ## Lists
 
 Unordered list:
@@ -99,11 +137,19 @@ Nested list:
   - Child item 3
 - Another parent item
 
-Task list (checkboxes):
+Task list (checkboxes) - try pressing `Space`!
 - [x] Completed task
 - [ ] Incomplete task
 - [x] Another completed task
 - [ ] Todo: Add more features
+- [ ] Todo: Record demo video
+
+Nested task list:
+- [x] Release v0.2.0
+- [ ] Prepare for U22 contest
+  - [ ] Polish README
+  - [ ] Record demo video
+  - [x] Fix encoding issues
 
 ## Blockquotes
 

@@ -280,8 +280,12 @@ pub struct UiTheme {
 
 impl UiTheme {
     /// 文字列をratatui::Colorに変換
+    ///
+    /// 色名(`red`, `LightCyan`など)に加えて16進数形式(`#RRGGBB` / `#RGB`)に対応。
+    /// 解釈できない値は`Color::Reset`を返す。
     pub fn parse_color(s: &str) -> Color {
-        match s.to_lowercase().as_str() {
+        let lower = s.trim().to_lowercase();
+        match lower.as_str() {
             "black" => Color::Black,
             "red" => Color::Red,
             "green" => Color::Green,
@@ -298,8 +302,30 @@ impl UiTheme {
             "lightmagenta" => Color::LightMagenta,
             "lightcyan" => Color::LightCyan,
             "white" => Color::White,
-            _ => Color::White, // デフォルト
+            "reset" | "default" => Color::Reset,
+            _ => Self::parse_hex_color(&lower).unwrap_or(Color::Reset),
         }
+    }
+
+    /// `#RRGGBB` / `#RGB` 形式の色を解釈する
+    fn parse_hex_color(s: &str) -> Option<Color> {
+        let hex = s.strip_prefix('#')?;
+        let (r, g, b) = match hex.len() {
+            6 => {
+                let r = u8::from_str_radix(&hex[0..2], 16).ok()?;
+                let g = u8::from_str_radix(&hex[2..4], 16).ok()?;
+                let b = u8::from_str_radix(&hex[4..6], 16).ok()?;
+                (r, g, b)
+            }
+            3 => {
+                let r = u8::from_str_radix(&hex[0..1], 16).ok()?;
+                let g = u8::from_str_radix(&hex[1..2], 16).ok()?;
+                let b = u8::from_str_radix(&hex[2..3], 16).ok()?;
+                (r * 17, g * 17, b * 17)
+            }
+            _ => return None,
+        };
+        Some(Color::Rgb(r, g, b))
     }
 
     /// デフォルトのダークテーマ
@@ -495,6 +521,31 @@ impl UiTheme {
 pub struct ThemeManager {
     themes: HashMap<String, UiTheme>,
     current_theme: String,
+}
+
+/// カスタムテーマのデフォルト設定ファイルパスを返す
+///
+/// 探索順:
+/// 1. `$XDG_CONFIG_HOME/mdv/theme.toml` (XDG_CONFIG_HOMEが設定されている場合)
+/// 2. `$HOME/.config/mdv/theme.toml` (Linux/macOS)
+/// 3. `%APPDATA%\mdv\theme.toml` (Windows)
+pub fn default_config_path() -> Option<PathBuf> {
+    if let Some(xdg) = std::env::var_os("XDG_CONFIG_HOME") {
+        let path = PathBuf::from(xdg).join("mdv").join("theme.toml");
+        return Some(path);
+    }
+    if let Some(home) = std::env::var_os("HOME") {
+        let path = PathBuf::from(home)
+            .join(".config")
+            .join("mdv")
+            .join("theme.toml");
+        return Some(path);
+    }
+    if let Some(appdata) = std::env::var_os("APPDATA") {
+        let path = PathBuf::from(appdata).join("mdv").join("theme.toml");
+        return Some(path);
+    }
+    None
 }
 
 impl ThemeManager {

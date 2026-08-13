@@ -25,6 +25,10 @@ pub struct Cli {
     #[arg(long, default_value = "dark")]
     pub ui_theme: String,
 
+    /// Custom UI theme file (TOML). Takes precedence over --ui-theme.
+    #[arg(long, value_name = "FILE")]
+    pub config: Option<PathBuf>,
+
     /// Start with table of contents open
     #[arg(long)]
     pub show_toc: bool,

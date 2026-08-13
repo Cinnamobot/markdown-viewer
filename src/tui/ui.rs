@@ -131,6 +131,8 @@ fn render_status_bar<'a>(
             },
             app.search_results.len()
         )
+    } else if let Some(message) = &app.status_message {
+        format!(" {message} ")
     } else {
         format!(
             " {} | Line {}/{} | Mode: {} | Theme: {} ",
@@ -191,6 +193,66 @@ pub fn render<'a>(
 
     // Render status bar at the bottom
     render_status_bar(frame, size, app, theme_manager);
+
+    // ヘルプオーバーレイは最後に描画して最前面に表示
+    if app.show_help {
+        render_help_overlay(frame, size, theme);
+    }
+}
+
+/// キーバインド一覧のヘルプオーバーレイを中央に表示する
+fn render_help_overlay(frame: &mut Frame, area: Rect, theme: &UiTheme) {
+    let help_lines: Vec<Line> = vec![
+        Line::from(""),
+        Line::from(Span::styled(
+            " mdv keyboard shortcuts ",
+            Style::default().add_modifier(Modifier::BOLD),
+        )),
+        Line::from(""),
+        Line::from(" j / k or Up / Down   Scroll up / down"),
+        Line::from(" g / G                Jump to top / bottom"),
+        Line::from(" PageUp / PageDown    Scroll by one page"),
+        Line::from(" t                    Toggle table of contents"),
+        Line::from(" Enter (in TOC)       Jump to selected heading"),
+        Line::from(" Space                Toggle checkbox under cursor"),
+        Line::from(" /                    Start search"),
+        Line::from(" n / N                Next / previous search result"),
+        Line::from(" ?                    Toggle this help"),
+        Line::from(" q / Ctrl+C           Quit"),
+        Line::from(""),
+        Line::from(Span::styled(
+            " Press ?, Esc or q to close ",
+            Style::default().fg(theme.text.muted()),
+        )),
+        Line::from(""),
+    ];
+
+    let popup_width = help_lines
+        .iter()
+        .map(|line| line.width())
+        .max()
+        .unwrap_or(40)
+        .min(area.width.saturating_sub(4) as usize)
+        .max(20) as u16;
+    let popup_height = help_lines.len() as u16;
+
+    let popup_area = Rect {
+        x: area.x + (area.width.saturating_sub(popup_width)) / 2,
+        y: area.y + (area.height.saturating_sub(popup_height)) / 2,
+        width: popup_width,
+        height: popup_height,
+    };
+
+    let popup = Paragraph::new(help_lines)
+        .block(
+            Block::default()
+                .borders(Borders::ALL)
+                .border_style(Style::default().fg(theme.border.primary()))
+                .title(" Help "),
+        )
+        .alignment(ratatui::layout::Alignment::Left);
+
+    frame.render_widget(popup, popup_area);
 }
 
 fn render_content<'a>(frame: &mut Frame, area: Rect, app: &App<'a>, theme: &UiTheme) {
@@ -435,6 +497,7 @@ fn parsed_line_to_ratatui_lines(
             indent,
             content,
             checked,
+            ..
         } => {
             let indent_str = "  ".repeat(*indent);
 

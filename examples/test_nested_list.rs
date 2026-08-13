@@ -20,6 +20,7 @@ fn main() {
             indent,
             content,
             checked,
+            ..
         } = line
         {
             if content.contains("Parent")
