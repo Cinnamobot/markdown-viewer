@@ -1,6 +1,6 @@
 use crate::error::MdError;
 use notify::{RecommendedWatcher, RecursiveMode};
-use notify_debouncer_full::{new_debouncer, Debouncer, FileIdMap};
+use notify_debouncer_full::{new_debouncer, Debouncer, RecommendedCache};
 use std::path::PathBuf;
 use std::time::Duration;
 use tokio::sync::mpsc;
@@ -13,7 +13,7 @@ pub enum ReloadEvent {
 }
 
 pub struct LiveReloader {
-    _debouncer: Debouncer<RecommendedWatcher, FileIdMap>,
+    _debouncer: Debouncer<RecommendedWatcher, RecommendedCache>,
     rx: mpsc::Receiver<ReloadEvent>,
     cancel_token: CancellationToken,
     _task_handles: Vec<tokio::task::JoinHandle<()>>,
