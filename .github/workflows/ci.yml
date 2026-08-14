@@ -120,6 +120,15 @@ jobs:
       - name: Build
         run: cargo build --release --verbose
 
+      - name: Upload binary artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: mdv-${{ matrix.os }}
+          path: |
+            target/release/mdv
+            target/release/mdv.exe
+          if-no-files-found: error
+
   coverage:
     name: Coverage
     runs-on: ubuntu-latest
