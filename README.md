@@ -144,10 +144,7 @@ mdv examples/sample.md
 | `mdv -l 100 README.md` | 100行目から表示 |
 | `mdv -H "Installation" README.md` | 特定の見出しにジャンプ |
 | `mdv -t "base16-ocean.dark" README.md` | テーマを変更 |
-| `mdv --config theme.toml README.md` | カスタムテーマ（TOML）を読み込む |
 | `mdv --ui-theme light README.md` | UIテーマをライトに変更 |
-
-カスタムテーマは `~/.config/mdv/theme.toml`（Linux/macOS）または `%APPDATA%\mdv\theme.toml`（Windows）に置くと自動で読み込まれます。色は `red` などの色名と `#FF8800` 形式の16進数の両方に対応しています。
 
 ### 🎨 利用可能なテーマ
 
@@ -172,8 +169,6 @@ Vim ライクなキーバインドで直感的に操作。
 | `PageUp` | ページ上 | 画面1つ分上へ |
 | `t` | 目次の表示/非表示 | トグル切り替え |
 | `Enter` | 見出しにジャンプ | 目次内で使用 |
-| `Space` | チェックボックスをトグル | カーソル位置のタスクを `[ ]` ⇔ `[x]` に切り替え、ファイルへ書き戻す |
-| `/` | 検索開始 | `n` / `N` で次の/前の結果へ |
 | `?` | ヘルプ表示 | キーバインド一覧を表示 |
 | `q` / `Ctrl+C` | 終了 | アプリケーション終了 |
 
@@ -264,10 +259,10 @@ mdv を改善するあなたの力が必要です：
 
 将来の機能拡張:
 
-- [x] 🔍 検索機能（`/`キー）
-- [x] 🎨 カスタムテーマ設定（`--config` / `~/.config/mdv/theme.toml`）
-- [x] ✅ チェックボックス連動（`Space`キーでファイルへ書き戻し）
 - [x] ❓ ヘルプ画面（`?`キー）
+- [ ] 🔍 検索機能
+- [ ] 🎨 カスタムテーマ設定
+- [ ] ✅ チェックボックス連動
 - [ ] 🔖 ブックマーク機能
 - [ ] 📤 エクスポート機能（HTML/PDF）
 - [ ] 🖥️ GUIモードの追加（eframe/egui）

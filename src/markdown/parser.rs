@@ -23,7 +23,6 @@ pub enum ParsedLine {
         indent: usize,
         content: String,
         checked: Option<bool>, // None = 通常のリスト, Some(true) = チェック済み, Some(false) = 未チェック
-        line_num: Option<usize>, // チェックボックスのあるソース行(0始まり)。通常リストはNone
     },
     Table {
         headers: Vec<String>,
@@ -84,7 +83,7 @@ impl MarkdownDocument {
         options.insert(Options::ENABLE_STRIKETHROUGH);
         options.insert(Options::ENABLE_TASKLISTS);
 
-        let offset_iter = Parser::new_ext(&content, options).into_offset_iter();
+        let parser = Parser::new_ext(&content, options);
         let mut current_line = 0;
 
         let mut in_heading = false;
@@ -97,7 +96,7 @@ impl MarkdownDocument {
 
         let mut in_list = false;
         let mut list_depth: usize = 0;
-        let mut list_item_stack: Vec<(String, Option<bool>, usize, Option<usize>)> = Vec::new(); // (content, checked, indent, line_num)のスタック
+        let mut list_item_stack: Vec<(String, Option<bool>, usize)> = Vec::new(); // (content, checked, indent)のスタック
 
         let mut in_blockquote = false;
         let mut blockquote_content = String::new();
@@ -116,7 +115,7 @@ impl MarkdownDocument {
 
         let mut current_text = String::new();
 
-        for (event, range) in offset_iter {
+        for event in parser {
             match event {
                 Event::Start(Tag::Heading { level, .. }) => {
                     if !current_text.is_empty() {
@@ -194,7 +193,6 @@ impl MarkdownDocument {
                                     indent: item.2,
                                     content: item.0.trim().to_string(),
                                     checked: item.1,
-                                    line_num: item.3,
                                 });
                                 // 出力済みなので内容をクリア（インデントレベルは保持）
                                 item.0.clear();
@@ -214,28 +212,26 @@ impl MarkdownDocument {
                 Event::Start(Tag::Item) => {
                     // 新しいアイテムをスタックにプッシュ
                     let indent = list_depth.saturating_sub(1);
-                    list_item_stack.push((String::new(), None, indent, None));
+                    list_item_stack.push((String::new(), None, indent));
                 }
                 Event::End(TagEnd::Item) => {
                     if in_list {
-                        if let Some((content, checked, indent, line_num)) = list_item_stack.pop() {
+                        if let Some((content, checked, indent)) = list_item_stack.pop() {
                             // 内容が空でない場合のみ出力（既に出力済みの場合は空）
                             if !content.trim().is_empty() {
                                 parsed_lines.push(ParsedLine::ListItem {
                                     indent,
                                     content: content.trim().to_string(),
                                     checked,
-                                    line_num,
                                 });
                             }
                         }
                     }
                 }
                 Event::TaskListMarker(checked) => {
-                    // 現在のアイテムのcheckedフラグとソース行番号を設定
+                    // 現在のアイテムのcheckedフラグを設定
                     if let Some(item) = list_item_stack.last_mut() {
                         item.1 = Some(checked);
-                        item.3 = Some(byte_offset_to_line_number(&content, range.start));
                     }
                 }
                 Event::Start(Tag::BlockQuote(_)) => {
@@ -429,55 +425,4 @@ impl MarkdownDocument {
             toc,
         })
     }
-}
-
-/// バイトオフセットから0始まりの行番号を算出する
-fn byte_offset_to_line_number(content: &str, byte_offset: usize) -> usize {
-    let offset = byte_offset.min(content.len());
-    content[..offset].bytes().filter(|&b| b == b'\n').count()
-}
-
-/// 指定行のチェックボックスをトグルし、新しいコンテンツを返す
-///
-/// - `line_num`: 0始まりのソース行番号
-/// - 返り値: トグルできた場合は `Some(新しいコンテンツ)`、該当行にチェックボックスが
-///   ない場合は `None`
-pub fn toggle_checkbox_in_content(content: &str, line_num: usize) -> Option<String> {
-    let mut lines: Vec<&str> = content.split('\n').collect();
-    let line = *lines.get(line_num)?;
-
-    let new_line = toggle_checkbox_marker(line)?;
-    lines[line_num] = &new_line;
-
-    Some(lines.join("\n"))
-}
-
-/// 行内の最初のチェックボックスマーカー(`[ ]` / `[x]` / `[X]`)をトグルする
-fn toggle_checkbox_marker(line: &str) -> Option<String> {
-    let bytes = line.as_bytes();
-    for (i, &b) in bytes.iter().enumerate() {
-        if b != b'[' {
-            continue;
-        }
-        match bytes.get(i + 1) {
-            Some(b' ') if bytes.get(i + 2) == Some(&b']') => {
-                // 未チェック → チェック済み
-                let mut toggled = String::with_capacity(line.len());
-                toggled.push_str(&line[..i + 1]);
-                toggled.push('x');
-                toggled.push_str(&line[i + 2..]);
-                return Some(toggled);
-            }
-            Some(b'x' | b'X') if bytes.get(i + 2) == Some(&b']') => {
-                // チェック済み → 未チェック
-                let mut toggled = String::with_capacity(line.len());
-                toggled.push_str(&line[..i + 1]);
-                toggled.push(' ');
-                toggled.push_str(&line[i + 2..]);
-                return Some(toggled);
-            }
-            _ => {}
-        }
-    }
-    None
 }

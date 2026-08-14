@@ -24,38 +24,7 @@ async fn main() -> Result<(), MdError> {
     let document = MarkdownDocument::parse(cli.path.clone(), content, &highlighter)?;
 
     let mut theme_manager = ThemeManager::new();
-
-    // カスタムテーマ設定を読み込む
-    // 優先順位: --config > デフォルト設定パス > --ui-theme
-    let config_loaded = if let Some(config_path) = &cli.config {
-        theme_manager
-            .load_theme_from_file("custom".to_string(), config_path)
-            .map_err(|e| MdError::ThemeLoadError(format!("{}: {e}", config_path.display())))?;
-        true
-    } else if let Some(default_path) = tui::themes::default_config_path() {
-        if default_path.exists() {
-            match theme_manager.load_theme_from_file("custom".to_string(), &default_path) {
-                Ok(()) => true,
-                Err(e) => {
-                    eprintln!(
-                        "Failed to load custom theme from {}: {e}",
-                        default_path.display()
-                    );
-                    false
-                }
-            }
-        } else {
-            false
-        }
-    } else {
-        false
-    };
-
-    if config_loaded {
-        theme_manager.set_theme("custom");
-    } else {
-        theme_manager.set_theme(&cli.ui_theme);
-    }
+    theme_manager.set_theme(&cli.ui_theme);
 
     let mut app = App::new(document, cli.show_toc, cli.line, &theme_manager);
 
@@ -111,17 +80,6 @@ async fn run_app<'a>(
                     app.handle_key(key.code, key.modifiers);
                     if app.should_quit {
                         break;
-                    }
-                    // チェックボックスをトグルした場合は再パースして表示を更新
-                    if let Some(new_content) = app.take_updated_content() {
-                        match MarkdownDocument::parse(cli.path.clone(), new_content, highlighter) {
-                            Ok(new_document) => {
-                                app.update_document(new_document);
-                            }
-                            Err(e) => {
-                                eprintln!("Failed to parse markdown: {e}");
-                            }
-                        }
                     }
                 }
             }

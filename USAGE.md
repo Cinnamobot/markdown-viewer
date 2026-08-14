@@ -100,40 +100,6 @@ mdv -H "Installation" README.md
 
 "Installation"という見出しにジャンプします（部分一致）。
 
-### カスタムテーマを指定
-
-```bash
-# 設定ファイルを直接指定
-mdv --config ~/my-theme.toml README.md
-
-# もしくはデフォルトの設定パスに置くと自動で読み込まれる
-#   Linux/macOS: ~/.config/mdv/theme.toml  ($XDG_CONFIG_HOME/mdv/theme.toml)
-#   Windows:     %APPDATA%\mdv\theme.toml
-mdv README.md
-```
-
-設定ファイルの書式はTOMLです。各要素の色は色名（`red`, `LightCyan`）または16進数（`#FF8800`, `#F80`）で指定します。未指定の項目はデフォルト値が使われます。
-
-```toml
-[heading]
-h1 = "#FF0000"
-h2 = "LightCyan"
-
-[list]
-bullet = "#00FF00"
-checked = "#00FF00"
-unchecked = "#FFFF00"
-
-[status_bar]
-background = "Blue"
-foreground = "White"
-
-[layout]
-wrap_text = true
-toc_width_percent = 30
-code_block_width_percent = 85
-```
-
 ## キーボード操作
 
 ### 基本移動
@@ -145,23 +111,11 @@ code_block_width_percent = 85
 - `g` - ファイルの先頭にジャンプ
 - `G` (Shift+g) - ファイルの末尾にジャンプ
 
-### タスクリスト
-
-- `Space` - カーソル位置のチェックボックスをトグル（ファイルへ書き戻し）
-
 ### 目次操作
 
 - `t` - 目次の表示/非表示を切り替え
 - 目次表示中に `j`/`k` - 見出しを選択
 - 目次表示中に `Enter` - 選択した見出しにジャンプ
-
-### 検索
-
-- `/` - 検索モードを開始
-- `Enter` - 検索を実行
-- `n` - 次の検索結果へ
-- `N` - 前の検索結果へ
-- `Esc` - 検索モードを終了
 
 ### ヘルプ
 

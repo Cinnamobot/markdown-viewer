@@ -6,24 +6,21 @@
 
 ### ✨ 機能追加
 
-- **チェックボックス連動** (`Space`キー)
-  - カーソル位置のタスクリストを `[ ]` ⇔ `[x]` にトグル
-  - 元のファイルに書き戻し、即座に再描画
-  - ネストされたタスクリストにも対応
-- **カスタムテーマ設定** (`--config <file>` / デフォルト設定パス)
-  - `~/.config/mdv/theme.toml`（Linux/macOS）、`%APPDATA%\mdv\theme.toml`（Windows）に配置すると自動読み込み
-  - 色名に加えて16進数形式（`#RRGGBB` / `#RGB`）に対応
 - **ヘルプ画面** (`?`キー)
   - 全キーバインドの一覧を中央オーバーレイで表示
 
 ### 🔧 改善
 
+- **機能の絞り込み** - 「ビューアー」としてのコンセプトを明確化
+  - チェックボックスのファイル書き戻し（編集機能）を削除
+  - 検索機能（`/`キー）を削除
+  - カスタムテーマ設定（`--config` / 設定ファイル自動読み込み）を削除
 - `Cargo.lock` をリポジトリに含め、再現可能なビルドを保証
 - CI: ビルドジョブを Windows / macOS / Linux の matrix に拡張
 - CI: カバレッジ閾値を20%→25%に引き上げ
 - リポジトリ内の破損したエンコーディング（CHANGELOG.md / USAGE.md）を修正
 - コミット済みの不要ファイル（tarpaulinレポート、Zone.Identifier）を削除
-- `notify-debouncer-full` 0.4のAPI変更（`NoCache`→`FileIdMap`）に対応
+- `notify-debouncer-full` 0.4のAPI変更（`NoCache`→`RecommendedCache`）に対応
 
 ## [0.2.0] - 2026-01-11
 

@@ -54,8 +54,6 @@ mdv -H "Installation" README.md
 | `PageDown/PageUp` | Page scroll |
 | `t` | Toggle table of contents |
 | `Enter` | Jump to selected heading (in TOC) |
-| `Space` | Toggle checkbox (writes back to file) |
-| `/` | Search (`n` / `N` for next/prev) |
 | `?` | Show help |
 | `q` / `Ctrl+C` | Quit |
 
@@ -137,12 +135,11 @@ Nested list:
   - Child item 3
 - Another parent item
 
-Task list (checkboxes) - try pressing `Space`!
+Task list (checkboxes):
 - [x] Completed task
 - [ ] Incomplete task
 - [x] Another completed task
 - [ ] Todo: Add more features
-- [ ] Todo: Record demo video
 
 Nested task list:
 - [x] Release v0.2.0

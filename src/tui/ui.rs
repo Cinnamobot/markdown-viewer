@@ -120,29 +120,14 @@ fn render_status_bar<'a>(
     theme_manager: &'a crate::tui::ThemeManager,
 ) {
     let theme = &theme_manager.current_theme();
-    let status_text = if app.search_mode {
-        format!(
-            " Search: {} | {}/{} matches ",
-            app.search_query,
-            if app.search_results.is_empty() {
-                0
-            } else {
-                app.current_search_index + 1
-            },
-            app.search_results.len()
-        )
-    } else if let Some(message) = &app.status_message {
-        format!(" {message} ")
-    } else {
-        format!(
-            " {} | Line {}/{} | Mode: {} | Theme: {} ",
-            app.document.path.display(),
-            app.current_line + 1,
-            app.document.parsed_lines.len(),
-            if app.show_toc { "TOC" } else { "View" },
-            theme_manager.current_theme_name()
-        )
-    };
+    let status_text = format!(
+        " {} | Line {}/{} | Mode: {} | Theme: {} ",
+        app.document.path.display(),
+        app.current_line + 1,
+        app.document.parsed_lines.len(),
+        if app.show_toc { "TOC" } else { "View" },
+        theme_manager.current_theme_name()
+    );
 
     let status_bar = Paragraph::new(status_text)
         .style(
@@ -214,9 +199,6 @@ fn render_help_overlay(frame: &mut Frame, area: Rect, theme: &UiTheme) {
         Line::from(" PageUp / PageDown    Scroll by one page"),
         Line::from(" t                    Toggle table of contents"),
         Line::from(" Enter (in TOC)       Jump to selected heading"),
-        Line::from(" Space                Toggle checkbox under cursor"),
-        Line::from(" /                    Start search"),
-        Line::from(" n / N                Next / previous search result"),
         Line::from(" ?                    Toggle this help"),
         Line::from(" q / Ctrl+C           Quit"),
         Line::from(""),

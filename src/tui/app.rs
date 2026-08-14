@@ -1,5 +1,4 @@
-use crate::error::MdError;
-use crate::markdown::{self, MarkdownDocument};
+use crate::markdown::MarkdownDocument;
 use crate::tui::ui::calculate_toc_width;
 use crate::tui::ThemeManager;
 use crossterm::event::{KeyCode, KeyModifiers};
@@ -13,13 +12,7 @@ pub struct App<'a> {
     pub should_quit: bool,
     pub viewport_height: usize,
     pub theme_manager: &'a ThemeManager,
-    pub search_mode: bool,
-    pub search_query: String,
-    pub search_results: Vec<usize>,
-    pub current_search_index: usize,
     pub toc_width_cache: Option<u16>,
-    pub updated_content: Option<String>,
-    pub status_message: Option<String>,
     pub show_help: bool,
 }
 
@@ -40,13 +33,7 @@ impl<'a> App<'a> {
             should_quit: false,
             viewport_height: 0,
             theme_manager,
-            search_mode: false,
-            search_query: String::new(),
-            search_results: Vec::new(),
-            current_search_index: 0,
             toc_width_cache: None,
-            updated_content: None,
-            status_message: None,
             show_help: false,
         }
     }
@@ -78,16 +65,6 @@ impl<'a> App<'a> {
             return;
         }
 
-        // Handle search mode input
-        if self.search_mode && matches!(key, KeyCode::Char(_)) && modifiers.is_empty() {
-            if let KeyCode::Char(c) = key {
-                self.search_query.push(c);
-            }
-            return;
-        }
-
-        self.status_message = None;
-
         match (key, modifiers) {
             (KeyCode::Char('q'), _) | (KeyCode::Char('c'), KeyModifiers::CONTROL) => {
                 self.should_quit = true
@@ -106,17 +83,9 @@ impl<'a> App<'a> {
                     self.scroll_up();
                 }
             }
-            (KeyCode::Char(' '), _) if !self.show_toc => {
-                let _ = self.toggle_current_checkbox();
-            }
             (KeyCode::Char('?'), _) => self.show_help = true,
             (KeyCode::Char('t'), _) => self.toggle_toc(),
             (KeyCode::Enter, _) if self.show_toc => self.jump_to_heading(),
-            (KeyCode::Enter, _) if self.search_mode => self.perform_search(),
-            (KeyCode::Char('/'), _) if !self.search_mode => self.start_search(),
-            (KeyCode::Char('n'), _) => self.next_search_result(),
-            (KeyCode::Char('N'), KeyModifiers::SHIFT) => self.prev_search_result(),
-            (KeyCode::Esc, _) if self.search_mode => self.end_search(),
             (KeyCode::Char('g'), _) => self.scroll_to_top(),
             (KeyCode::Char('G'), KeyModifiers::SHIFT) => self.scroll_to_bottom(),
             (KeyCode::PageDown, _) => self.page_down(),
@@ -188,42 +157,6 @@ impl<'a> App<'a> {
         }
     }
 
-    /// カーソル位置のチェックボックスをトグルしてファイルへ書き戻す
-    ///
-    /// 成功時は `updated_content` に新しいコンテンツが入り、呼び出し側が
-    /// 再パースして `update_document` する。
-    pub fn toggle_current_checkbox(&mut self) -> Result<(), MdError> {
-        let line_num = match self.document.parsed_lines.get(self.scroll_offset) {
-            Some(markdown::ParsedLine::ListItem {
-                line_num: Some(n), ..
-            }) => *n,
-            _ => return Ok(()),
-        };
-
-        let new_content =
-            match markdown::parser::toggle_checkbox_in_content(&self.document.content, line_num) {
-                Some(content) => content,
-                None => return Ok(()),
-            };
-
-        match std::fs::write(&self.document.path, &new_content) {
-            Ok(()) => {
-                self.status_message = Some("Checkbox toggled".to_string());
-                self.updated_content = Some(new_content);
-                Ok(())
-            }
-            Err(e) => {
-                self.status_message = Some(format!("Write failed: {e}"));
-                Err(e.into())
-            }
-        }
-    }
-
-    /// トグル後の新しいコンテンツを取り出す
-    pub fn take_updated_content(&mut self) -> Option<String> {
-        self.updated_content.take()
-    }
-
     /// Get cached TOC width or calculate if not cached
     pub fn get_toc_width(&mut self, theme: &crate::tui::UiTheme, terminal_width: u16) -> u16 {
         if let Some(cached_width) = self.toc_width_cache {
@@ -238,71 +171,5 @@ impl<'a> App<'a> {
     /// Clear TOC width cache when document changes
     pub fn invalidate_toc_cache(&mut self) {
         self.toc_width_cache = None;
-    }
-
-    pub fn start_search(&mut self) {
-        self.search_mode = true;
-        self.search_query.clear();
-        self.search_results.clear();
-        self.current_search_index = 0;
-    }
-
-    pub fn end_search(&mut self) {
-        self.search_mode = false;
-        self.search_query.clear();
-        self.search_results.clear();
-        self.current_search_index = 0;
-    }
-
-    pub fn perform_search(&mut self) {
-        if self.search_query.is_empty() {
-            self.end_search();
-            return;
-        }
-
-        self.search_results.clear();
-        let query_lower = self.search_query.to_lowercase();
-
-        for (line_idx, parsed_line) in self.document.parsed_lines.iter().enumerate() {
-            let content = match parsed_line {
-                crate::markdown::ParsedLine::Text { content } => content.as_str(),
-                crate::markdown::ParsedLine::Code { content, .. } => content.as_str(),
-                crate::markdown::ParsedLine::ListItem { content, .. } => content.as_str(),
-                crate::markdown::ParsedLine::BlockQuote { content } => content.as_str(),
-                crate::markdown::ParsedLine::Alert { content, .. } => content.as_str(),
-                _ => continue,
-            };
-
-            if content.to_lowercase().contains(&query_lower) {
-                self.search_results.push(line_idx);
-            }
-        }
-
-        self.current_search_index = 0;
-        if !self.search_results.is_empty() {
-            self.scroll_offset = self.search_results[0];
-        }
-    }
-
-    pub fn next_search_result(&mut self) {
-        if self.search_results.is_empty() {
-            return;
-        }
-
-        self.current_search_index = (self.current_search_index + 1) % self.search_results.len();
-        self.scroll_offset = self.search_results[self.current_search_index];
-    }
-
-    pub fn prev_search_result(&mut self) {
-        if self.search_results.is_empty() {
-            return;
-        }
-
-        self.current_search_index = if self.current_search_index == 0 {
-            self.search_results.len() - 1
-        } else {
-            self.current_search_index - 1
-        };
-        self.scroll_offset = self.search_results[self.current_search_index];
     }
 }
