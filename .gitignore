@@ -1,4 +1,5 @@
 /target
+/dist
 tarpaulin-report.html
 cobertura.xml
 *.Zone.Identifier

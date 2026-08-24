@@ -80,10 +80,10 @@ mdv --show-toc examples/sample.md
 
 ## 提出資料チェックリスト(事務局ストレージへアップロード)
 
-- [ ] ソースコード一式(リポジトリのzip: Cargo.lock込み)
-- [ ] プログラムファイル一式(Windows / macOS / Linuxの各バイナリ)
-- [ ] サンプルデータ(examples/sample.md)
-- [ ] 作品説明資料(README.md、USAGE.md)
-- [ ] 別添参照_LICENSE-DEPENDENCIES.txt(依存OSSライセンス一覧)
-- [ ] ウイルスチェック実施
-- [ ] ファイル名は内容が分かる命名にする(「ソースコード」「プログラムファイル」等)
+- [x] ソースコード一式(リポジトリのzip: Cargo.lock込み) → `dist/u22-submission/ソースコード/mdv-ソースコード.zip`
+- [x] プログラムファイル一式(Windows / macOS / Linuxの各バイナリ) → `dist/u22-submission/プログラムファイル/`
+- [x] サンプルデータ(examples/sample.md) → `dist/u22-submission/サンプルデータ/`
+- [x] 作品説明資料(README.md、USAGE.md) → `dist/u22-submission/作品説明資料/`
+- [x] 別添参照_LICENSE-DEPENDENCIES.txt(依存OSSライセンス一覧) → `dist/u22-submission/ライセンス一覧/` (138件・3OSリリース依存)
+- [x] ウイルスチェック実施(Windows Defender 2026-08-24、mdv関連の検出なし)
+- [x] ファイル名は内容が分かる命名にする(「ソースコード」「プログラムファイル」等)
