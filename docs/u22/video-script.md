@@ -2,11 +2,32 @@
 
 ## 撮影環境
 
-- **録画ツール**: OBS Studio(推奨)またはWindows標準の画面録画
+- **録画ツール**: **cap**(推奨、インストール済み)または OBS Studio / Windows標準の画面録画
+- **cap の設定**: ウィンドウキャプチャで Windows Terminal のみを選択 / 解像度 1920x1080 / 60fps / 音声はナレーション用に別録り
 - **ターミナル**: Windows Terminal(推奨設定: 透過オフ・大きめフォント・ダークテーマ)
 - **解像度**: 1920x1080 / 60fps / ウィンドウキャプチャ(ターミナルのみ)
 - **BGM・効果音**: 任意(音量はナレーションの下に。無断使用不可のものを使わない)
 - **動画ファイル**: MP4(H.264)、3分以内
+
+### cap での撮影手順(事前準備)
+
+1. **作業用ディレクトリを用意**:
+   ```powershell
+   cd C:\Users\szk27\work\markdown-viewer
+   # バイナリを PATH に置くか、フルパスで起動する
+   $env:PATH += ";C:\Users\szk27\work\markdown-viewer\target\release"
+   ```
+2. **mdv が動くことを確認**(リハーサル):
+   ```powershell
+   mdv --version   # → mdv 0.2.0
+   mdv examples\sample.md -n   # 表示確認、q で終了
+   ```
+3. **cap を起動**し、キャプチャ対象に「Windows Terminal」ウィンドウを選択
+4. **録画開始ボタン**を押してから、下記シナリオを実行
+
+> 💡 ライブリロードの撮影(1:30-2:00)では、**ターミナルを2つ並べる**:
+> 左=エディタ(メモ帳)、右=mdv。cap のウィンドウキャプチャは両方を含むように領域選択する。
+> もしくは画面全体をキャプチャして編集で切り取る。
 
 ## 構成サマリ(合計 約2:50)
 
@@ -39,13 +60,18 @@
 
 **キー操作シナリオ**(時間と操作を合わせて録画):
 
+> ⚠️ 実装仕様: TOC 表示中は `j`/`k` が**目次内の選択移動**になり、
+> `Enter` でジャンプすると TOC は**自動で閉じる**(app.rs: jump_to_heading)。
+> 目次は「Features」「Installation」「Usage」… の順に並ぶ。
+
 | 時刻 | 操作 | 画面の説明 |
 |------|------|-----------|
 | 0:20 | `j` × 数回 | 下にスクロール |
 | 0:27 | `k` × 数回 | 上にスクロール |
 | 0:32 | `t` | 目次(Table of Contents)が右側に表示 |
-| 0:35 | `j`/`k` で項目選択→`Enter` | 「Installation」へジャンプ |
-| 0:42 | `t` | 目次を閉じる |
+| 0:35 | `j` × 1回 → `Enter` | 「Installation」を選択してジャンプ(目次は自動で閉じる) |
+| 0:42 | `t` | 再度目次を開く(次シーン用の見せ方) |
+| 0:44 | `t` | 目次を閉じる |
 | 0:45 | `?` | ヘルプ画面(キーバインド一覧)を表示 |
 | 0:48 | `?` | ヘルプを閉じる |
 
@@ -58,12 +84,17 @@
 **画面**: `sample.md` の該当箇所へスクロールして順に映す
 **キー操作**:
 
+> ⚠️ sample.md の実際の順序(実装検証済み):
+> GitHub Alerts(60行) → Code Example(77行) → Lists/タスクリスト(123行) → Tables(162行)。
+> PageDown は画面1枚分スキップするため、行数(下記の `-l` 指定)に合わせて調整する。
+> 確実に表示したい箇所は `-H` オプション(見出しジャンプ)を使うと安定する。
+
 | 時刻 | 操作 | 画面の説明 |
 |------|------|-----------|
-| 0:50 | `PageDown` | GitHub Alerts(NOTE/TIP/WARNING/CAUTION)の色分け表示 |
+| 0:50 | `PageDown` または `-H "GitHub Alerts"` で再起動 | GitHub Alerts(NOTE/TIP/WARNING/CAUTION)の色分け表示 |
 | 1:00 | `PageDown` | Rust / Python / JavaScriptコードのシンタックスハイライト |
-| 1:10 | `PageDown` | テーブル(罫線・列幅・配置) |
-| 1:20 | `PageDown` | ネストリスト・タスクリスト(`[x]`/`[ ]`の色分け) |
+| 1:10 | `PageDown` | ネストリスト・タスクリスト(`[x]`/`[ ]`の色分け) |
+| 1:20 | `PageDown` | テーブル(罫線・列幅・配置) |
 
 **ナレーション**:
 「GitHub Alertsの色分け、コードのシンタックスハイライト、テーブル、タスクリスト。
@@ -73,7 +104,10 @@
 
 **画面**: ターミナルを2つ並べる(左=エディタ、右=mdv)
 **操作**: 左のエディタ(メモ帳 or VSCode)で `sample.md` の文字を変更して保存
-→ 右のmdvが約0.1秒で自動更新される
+→ 右のmdvが自動更新される(デバウンス100ms + 再レンダリング)
+
+> ⚠️ 注意: ライブリロードを見せるには **mdv を `-n` なしで起動**すること。
+> `mdv examples\sample.md` (ウォッチ有効がデフォルト)。
 
 **ナレーション**:
 「ライブリロードに対応。エディタで保存するたびに、表示が自動的に更新されます。
@@ -83,14 +117,27 @@
 
 **画面**: 別ターミナルで計測コマンドを実行して見せる(録画時に実行)
 
-```bash
-# 起動時間(100KBのMarkdownを100回起動して平均)
-time for i in $(seq 1 100); do mdv large.md -n -q; done
+> ⚠️ mdv は TUI アプリのため `-q` オプションは**存在しません**。
+> 起動時間は以下のいずれかで計測してください(Windows / Linux 両対応):
 
-# メモリ使用量(タスクマネージャー or /usr/bin/time -v)
-/usr/bin/time -v mdv large.md
+```powershell
+# 起動時間の目安: --version は即終了するため起動オーバーヘッドを測れる
+# (Windows PowerShell / ターミナルで実行)
+Measure-Command { mdv --version | Out-Null }   # 例: 平均 ~30-40ms
+
+# メモリ使用量 (Windows タスクマネージャー or PowerShell)
+$p = Start-Process mdv -ArgumentList "examples\large.md -n" -PassThru
+$p.Refresh(); "{0:N1} MB" -f ($p.PrivateMemorySize64 / 1MB)   # 実測: ~5MB (Private)
+Stop-Process -Id $p.Id
 ```
 
+```bash
+# Linux/macOS の場合 (参考)
+time mdv --version
+/usr/bin/time -v mdv examples/large.md -n
+```
+
+**実測値(Windows 11, 2026-08-24 検証)**: 起動 ~30-40ms / Private メモリ ~5MB / WorkingSet ~12MB
 **テロップ**(画面に表示): 「起動 ~30ms / メモリ ~8MB / バイナリ ~4MB / ブラウザの1/50以下のリソース」
 
 **ナレーション**:
