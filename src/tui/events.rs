@@ -22,10 +22,11 @@ impl EventHandler {
     pub async fn next_key(&mut self) -> Result<Option<KeyEvent>, MdError> {
         if let Some(event) = self.stream.next().await {
             if let Event::Key(key) = event? {
-                // Ignore auto-repeat events: holding a key down (e.g. 't')
-                // would otherwise rapidly toggle the TOC open/closed.
-                // On Windows, key.kind is always set (Repeat for held keys).
-                if key.kind == KeyEventKind::Repeat {
+                // Only handle explicit key presses. On Windows, pressing a
+                // key reports both Press and Release events, and holding it
+                // reports Repeat events. Handling those would double-toggle
+                // the TOC: press opens it, release instantly closes it.
+                if key.kind != KeyEventKind::Press {
                     return Ok(None);
                 }
                 return Ok(Some(key));
@@ -40,19 +41,26 @@ mod tests {
     use super::*;
     use crossterm::event::{KeyCode, KeyModifiers};
 
-    /// A repeat (held-key) event must be filtered out by the handler logic.
     #[test]
-    fn test_repeat_key_is_ignored() {
-        let repeat =
-            KeyEvent::new_with_kind(KeyCode::Char('t'), KeyModifiers::NONE, KeyEventKind::Repeat);
-        assert_eq!(repeat.kind, KeyEventKind::Repeat);
-    }
-
-    /// A normal press event keeps its kind.
-    #[test]
-    fn test_press_key_kind() {
+    fn test_press_kind_is_handled() {
         let press =
             KeyEvent::new_with_kind(KeyCode::Char('t'), KeyModifiers::NONE, KeyEventKind::Press);
         assert_eq!(press.kind, KeyEventKind::Press);
+    }
+
+    #[test]
+    fn test_repeat_kind_is_ignored() {
+        let repeat =
+            KeyEvent::new_with_kind(KeyCode::Char('t'), KeyModifiers::NONE, KeyEventKind::Repeat);
+        assert_eq!(repeat.kind, KeyEventKind::Repeat);
+        assert_ne!(repeat.kind, KeyEventKind::Press);
+    }
+
+    #[test]
+    fn test_release_kind_is_ignored() {
+        let release =
+            KeyEvent::new_with_kind(KeyCode::Char('t'), KeyModifiers::NONE, KeyEventKind::Release);
+        assert_eq!(release.kind, KeyEventKind::Release);
+        assert_ne!(release.kind, KeyEventKind::Press);
     }
 }
