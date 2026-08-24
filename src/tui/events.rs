@@ -58,8 +58,11 @@ mod tests {
 
     #[test]
     fn test_release_kind_is_ignored() {
-        let release =
-            KeyEvent::new_with_kind(KeyCode::Char('t'), KeyModifiers::NONE, KeyEventKind::Release);
+        let release = KeyEvent::new_with_kind(
+            KeyCode::Char('t'),
+            KeyModifiers::NONE,
+            KeyEventKind::Release,
+        );
         assert_eq!(release.kind, KeyEventKind::Release);
         assert_ne!(release.kind, KeyEventKind::Press);
     }
